@@ -1,0 +1,40 @@
+:root {
+  color-scheme: dark;
+  --navy-abyss: #05070f;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--navy-abyss);
+  font-family: ui-monospace, 'Courier New', monospace;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#game {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+}
+
+/* Loading shim shown before Phaser paints its first frame. */
+#game::after {
+  content: '';
+}
