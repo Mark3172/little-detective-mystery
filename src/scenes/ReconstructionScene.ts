@@ -444,6 +444,7 @@ export class ReconstructionScene extends Phaser.Scene {
       ),
     );
     const go = button(this, GAME_W - 320, GAME_H - 116, 258, 40, 'NAME THE PASSENGER ▸', () => {
+      Audio.reconLeave();
       stopGameplay(this);
       this.scene.start(SCENE.accusation);
     }, { align: 'center', fill: P.violet0, hover: P.violet1, color: P.violet3 });
@@ -454,6 +455,7 @@ export class ReconstructionScene extends Phaser.Scene {
   private close(): void {
     if (this.busy) return;
     Audio.back();
+    Audio.reconLeave();
     GameState.save();
     this.scene.stop();
     this.scene.resume(SCENE.train);

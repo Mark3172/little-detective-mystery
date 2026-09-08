@@ -137,6 +137,25 @@ export function buildWorldTextures(scene: Phaser.Scene): void {
     px(c, 1, 0, 1, 3, 'rgba(245,215,142,0.55)');
     px(c, 0, 1, 3, 1, 'rgba(245,215,142,0.55)');
   });
+
+  // World-space interact key. A sprite, not Phaser Text — Text + backgroundColor
+  // ghosts under camera zoom and round-pixels.
+  makeTexture(scene, 'prompt_e', 9, 9, (c) => {
+    px(c, 0, 0, 9, 9, P.ink);
+    px(c, 1, 1, 7, 7, P.amber4);
+    px(c, 1, 1, 7, 1, P.paper);
+    px(c, 3, 2, 4, 1, P.ink);
+    px(c, 3, 3, 1, 4, P.ink);
+    px(c, 3, 4, 3, 1, P.ink);
+    px(c, 3, 6, 4, 1, P.ink);
+  });
+
+  makeTexture(scene, 'glint', 7, 7, (c) => {
+    px(c, 3, 0, 1, 7, P.amber4);
+    px(c, 0, 3, 7, 1, P.amber4);
+    px(c, 3, 2, 1, 3, P.paper);
+    px(c, 2, 3, 3, 1, P.paper);
+  });
 }
 
 /* ================================================================== */

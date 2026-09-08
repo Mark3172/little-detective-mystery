@@ -8,6 +8,8 @@ class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private ambienceGain: GainNode | null = null;
+  private musicGain: GainNode | null = null;
+  private musicGen = 0;
   private started = false;
 
   /** Call from any real user gesture (pointerdown / keydown). */
@@ -22,6 +24,7 @@ class AudioEngine {
       this.master.connect(this.ctx.destination);
       this.started = true;
       this.startAmbience();
+      this.startMysteryTheme();
     } catch {
       this.started = false;
     }
@@ -207,6 +210,36 @@ class AudioEngine {
     src.start();
   }
 
+  /** Wind, coupling clank, and footsteps while walking between carriages. */
+  crossing(): void {
+    if (!this.ctx || !this.master) return;
+    const ctx = this.ctx;
+    const buf = this.noiseBuffer(2.4);
+    if (buf) {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 780;
+      bp.Q.value = 0.7;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.09, ctx.currentTime + 0.2);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 2.2);
+      src.connect(bp).connect(g).connect(this.master);
+      src.start();
+    }
+    this.tone(90, 0.28, 'sine', 0.07, 0.12, 70);
+    for (let i = 0; i < 6; i++) {
+      window.setTimeout(() => this.step(), 280 + i * 360);
+    }
+  }
+
+  duckMusic(level: number): void {
+    if (!this.musicGain || !this.ctx) return;
+    this.musicGain.gain.setTargetAtTime(Math.max(0, level) * 0.22, this.ctx.currentTime, 0.12);
+  }
+
   chime(): void {
     [1047, 880, 698].forEach((f, i) => this.tone(f, 0.5, 'sine', 0.1, i * 0.22));
   }
@@ -217,9 +250,96 @@ class AudioEngine {
 
   /** Low sustained pad for Mind Reconstruction. */
   reconEnter(): void {
+    this.duckMusic(0.28);
     this.tone(147, 1.2, 'sine', 0.09);
     this.tone(220, 1.4, 'sine', 0.07, 0.1);
     this.tone(294, 1.6, 'sine', 0.05, 0.2);
+  }
+
+  reconLeave(): void {
+    this.duckMusic(1);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Mystery theme                                                     */
+  /* ---------------------------------------------------------------- */
+
+  private startMysteryTheme(): void {
+    if (!this.ctx || !this.master || this.musicGain) return;
+    const ctx = this.ctx;
+    this.musicGain = ctx.createGain();
+    this.musicGain.gain.value = 0;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1650;
+    this.musicGain.connect(lp).connect(this.master);
+    this.musicGain.gain.setTargetAtTime(0.22, ctx.currentTime, 1.4);
+
+    const drone = (freq: number, vol: number) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.value = vol;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.07 + freq / 4000;
+      const lfoG = ctx.createGain();
+      lfoG.gain.value = vol * 0.35;
+      lfo.connect(lfoG).connect(g.gain);
+      osc.connect(g).connect(this.musicGain!);
+      osc.start();
+      lfo.start();
+    };
+    drone(110, 0.11);
+    drone(164.81, 0.055);
+    drone(220, 0.03);
+
+    this.musicGen += 1;
+    this.playMysteryPhrase(this.musicGen);
+  }
+
+  private playMysteryPhrase(gen: number): void {
+    if (!this.ctx || !this.musicGain || gen !== this.musicGen) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.02;
+    const note = (at: number, freq: number, dur: number, vol: number, type: OscillatorType = 'triangle') => {
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0 + at);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0 + at);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + at + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
+      osc.connect(g).connect(this.musicGain!);
+      osc.start(t0 + at);
+      osc.stop(t0 + at + dur + 0.05);
+    };
+
+    // A-minor music-box line. Quiet enough to sit under rain and rumble.
+    const melody: [number, number, number, number][] = [
+      [0.0, 440, 0.72, 0.05],
+      [0.9, 523.25, 0.55, 0.045],
+      [1.55, 659.25, 1.15, 0.04],
+      [2.85, 587.33, 0.38, 0.042],
+      [3.28, 523.25, 0.38, 0.04],
+      [3.72, 440, 0.95, 0.045],
+      [4.8, 392, 0.42, 0.04],
+      [5.28, 349.23, 0.42, 0.038],
+      [5.78, 329.63, 0.95, 0.044],
+      [6.85, 261.63, 0.5, 0.04],
+      [7.45, 220, 1.5, 0.048],
+    ];
+    for (const [at, f, d, v] of melody) note(at, f, d, v);
+
+    const harmony: [number, number, number][] = [
+      [0.0, 220, 2.5],
+      [2.7, 174.61, 2.0],
+      [4.8, 164.81, 1.9],
+      [6.85, 110, 2.2],
+    ];
+    for (const [at, f, d] of harmony) note(at, f, d, 0.028, 'sine');
+
+    window.setTimeout(() => this.playMysteryPhrase(gen), 9200);
   }
 }
 

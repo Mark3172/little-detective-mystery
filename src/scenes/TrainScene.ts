@@ -12,7 +12,16 @@ import type { AreaId, Line } from '../data/types';
 type Target =
   | { kind: 'interact'; item: Interactable; x: number; y: number; label: string }
   | { kind: 'talk'; charId: string; x: number; y: number; label: string }
-  | { kind: 'door'; to: AreaId; side: 'left' | 'right'; x: number; y: number; label: string; locked?: string };
+  | { kind: 'door'; to: AreaId; side: 'left' | 'right'; x: number; y: number; label: string; locked?: string }
+  | { kind: 'furniture'; x: number; y: number; label: string; lines: Line[] };
+
+const TABLE_LOOK: Line[] = [
+  {
+    speaker: 'narrator',
+    text: 'A table set for a meal that never arrived. Sugar bowl, two cups, a napkin folded into a hat.',
+  },
+  { speaker: 'ori', emotion: 'neutral', text: '(Nothing squared to the edge. Nobody left a name here.)' },
+];
 
 export class TrainScene extends Phaser.Scene {
   private area!: Area;
@@ -23,7 +32,7 @@ export class TrainScene extends Phaser.Scene {
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private keys: Record<string, Phaser.Input.Keyboard.Key> = {};
   private target: Target | null = null;
-  private marker!: Phaser.GameObjects.Text;
+  private marker!: Phaser.GameObjects.Image;
   private overlayOpen = false;
   private tunnelOverlay!: Phaser.GameObjects.Rectangle;
   private scenerySprites: Phaser.GameObjects.TileSprite[] = [];
@@ -36,6 +45,7 @@ export class TrainScene extends Phaser.Scene {
   private touchVec = new Phaser.Math.Vector2(0, 0);
   private pendingPrologue = false;
   private saveT = 0;
+  private crossing = false;
 
   constructor() {
     super(SCENE.train);
@@ -60,20 +70,25 @@ export class TrainScene extends Phaser.Scene {
 
     if (!this.scene.isActive(SCENE.hud)) this.scene.launch(SCENE.hud);
 
+    this.game.canvas.setAttribute('tabindex', '0');
+    this.game.canvas.focus();
+
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.keys = (this.input.keyboard?.addKeys('W,A,S,D,E,J,R,ESC,SPACE,M') ?? {}) as Record<
       string,
       Phaser.Input.Keyboard.Key
     >;
+    this.input.keyboard?.addCapture(['E', 'SPACE', 'J', 'R', 'W', 'A', 'S', 'D']);
 
-    this.keys.E?.on('down', () => this.tryInteract());
-    this.keys.SPACE?.on('down', () => this.tryInteract());
     this.keys.J?.on('down', () => this.openNotebook());
     this.keys.R?.on('down', () => this.openReconstruction());
     this.keys.ESC?.on('down', () => this.openPause());
     this.keys.M?.on('down', () => Audio.setMuted(!Audio.muted));
 
-    this.input.on('pointerdown', () => Audio.unlock());
+    this.input.on('pointerdown', () => {
+      Audio.unlock();
+      this.game.canvas.focus();
+    });
     this.input.keyboard?.on('keydown', () => Audio.unlock());
 
     // Touch / HUD button bridge.
@@ -125,7 +140,7 @@ export class TrainScene extends Phaser.Scene {
     }
   }
 
-  private buildArea(id: AreaId): void {
+  private buildArea(id: AreaId, opts?: { fadeIn?: boolean; announce?: boolean }): void {
     this.area = AREAS[id];
     GameState.area = id;
     const { width, height } = this.area;
@@ -213,16 +228,25 @@ export class TrainScene extends Phaser.Scene {
       if (s.kind !== 'wall') this.drawSolid(s);
     }
 
-    // Interactable glints.
+    // Search sparkles sit on the walkable side of furniture so they are not
+    // trapped inside a collider the player cannot step onto.
     for (const item of this.area.interactables) {
       const done = GameState.interactPass(item.id) > 0;
-      const dot = this.add
-        .rectangle(item.x, item.y, 4, 4, toInt(done ? P.slate3 : P.amber4), done ? 0.5 : 0.95)
-        .setDepth(item.y + 1);
-      this.worldLayer.add(dot);
+      const at = this.reachPoint(item.x, item.y);
+      const dot = this.add.image(at.x, at.y, 'glint').setDepth(at.y + 2);
+      if (done) dot.setTint(toInt(P.slate3)).setAlpha(0.55);
+      dot.setInteractive({ useHandCursor: true, pixelPerfect: false });
+      dot.on('pointerdown', () => {
+        this.game.canvas.focus();
+        if (this.overlayOpen) return;
+        const d = this.interactDistance(this.player.x, this.player.y - 6, item.x, item.y);
+        if (d > (item.r ?? 56) + 10) return;
+        this.target = { kind: 'interact', item, x: at.x, y: at.y, label: item.label };
+        this.tryInteract();
+      });
       this.tweens.add({
         targets: dot,
-        alpha: { from: dot.alpha, to: dot.alpha * 0.25 },
+        alpha: { from: done ? 0.55 : 1, to: done ? 0.2 : 0.35 },
         duration: 900,
         yoyo: true,
         repeat: -1,
@@ -255,16 +279,9 @@ export class TrainScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.solids);
     this.physics.world.setBounds(0, 0, width, height);
 
-    // Interaction marker.
-    this.marker = this.add.text(0, 0, 'E', {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '10px',
-      color: P.ink,
-      backgroundColor: P.amber4,
-      padding: { x: 3, y: 1 },
-    });
-    this.marker.setResolution(2).setOrigin(0.5, 1).setDepth(9000).setVisible(false);
-    this.worldLayer.add(this.marker);
+    // Interaction marker — pixel sprite, kept off the world container so camera
+    // zoom cannot leave a canvas-text ghost on the floor.
+    this.marker = this.add.image(0, 0, 'prompt_e').setOrigin(0.5, 1).setDepth(9000).setVisible(false);
 
     // Tunnel darkness plate.
     this.tunnelOverlay = this.add
@@ -276,9 +293,8 @@ export class TrainScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, width, height);
     this.cameras.main.startFollow(this.player, true, 0.14, 0.14);
     this.cameras.main.setDeadzone(60, 40);
-    this.cameras.main.fadeIn(320, 5, 7, 15);
-
-    this.game.events.emit('area-changed', this.area);
+    if (opts?.fadeIn !== false) this.cameras.main.fadeIn(320, 5, 7, 15);
+    if (opts?.announce !== false) this.game.events.emit('area-changed', this.area);
   }
 
   private drawSolid(s: Solid): void {
@@ -300,13 +316,22 @@ export class TrainScene extends Phaser.Scene {
         g.fillStyle(toInt(P.amber2), 0.5);
         g.fillRect(s.x + 2, s.y + s.h - 6, s.w - 4, 1);
         break;
-      case 'table':
+      case 'table': {
         paint(P.wood2, '#8a5d3d', P.wood0);
         g.fillStyle(toInt(P.paper), 0.85);
         g.fillRect(s.x + 3, s.y + 3, s.w - 6, s.h - 8);
-        g.fillStyle(toInt(P.amber3), 0.8);
-        g.fillRect(s.x + s.w / 2 - 2, s.y + 4, 4, 4);
+        const cx = s.x + Math.floor(s.w / 2);
+        const cy = s.y + Math.floor(s.h / 2) - 1;
+        g.fillStyle(toInt(P.paperDim), 1);
+        g.fillRect(cx - 6, cy - 3, 11, 8);
+        g.fillStyle(toInt(P.wood2), 0.55);
+        g.fillRect(cx - 4, cy - 1, 7, 4);
+        g.fillStyle(toInt(P.slate2), 1);
+        g.fillRect(cx + 7, cy - 2, 4, 5);
+        g.fillStyle(toInt(P.amber1), 1);
+        g.fillRect(cx + 8, cy - 1, 2, 2);
         break;
+      }
       case 'counter':
         paint(P.wood1, P.amber2, P.wood0);
         g.fillStyle(toInt(P.amber3), 0.9);
@@ -362,6 +387,52 @@ export class TrainScene extends Phaser.Scene {
     this.worldLayer.add(g);
   }
 
+  private pointInSolid(x: number, y: number): Solid | null {
+    for (const s of this.area.solids) {
+      if (s.kind === 'wall') continue;
+      if (x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) return s;
+    }
+    return null;
+  }
+
+  private reachPoint(x: number, y: number): { x: number; y: number } {
+    const s = this.pointInSolid(x, y);
+    if (!s) return { x, y };
+    const aisle = (WALL_TOP + WALL_BOTTOM) / 2;
+    const ny = s.y + s.h / 2 < aisle ? s.y + s.h + 6 : s.y - 6;
+    const px = Phaser.Math.Clamp(x, s.x + 4, s.x + s.w - 4);
+    if (!this.pointInSolid(px, ny)) return { x: Math.round(px), y: Math.round(ny) };
+    const left = s.x - 8;
+    const right = s.x + s.w + 8;
+    return Math.abs(x - left) < Math.abs(x - right)
+      ? { x: Math.round(left), y: Math.round(y) }
+      : { x: Math.round(right), y: Math.round(y) };
+  }
+
+  private interactDistance(px: number, py: number, ix: number, iy: number): number {
+    const s = this.pointInSolid(ix, iy);
+    if (!s) return Phaser.Math.Distance.Between(px, py, ix, iy);
+    const cx = Phaser.Math.Clamp(px, s.x, s.x + s.w);
+    const cy = Phaser.Math.Clamp(py, s.y, s.y + s.h);
+    return Math.hypot(px - cx, py - cy);
+  }
+
+  private adjacentTable(px: number, py: number): Solid | null {
+    let best: Solid | null = null;
+    let bestD = 10;
+    for (const s of this.area.solids) {
+      if (s.kind !== 'table') continue;
+      const cx = Phaser.Math.Clamp(px, s.x, s.x + s.w);
+      const cy = Phaser.Math.Clamp(py, s.y, s.y + s.h);
+      const d = Math.hypot(px - cx, py - cy);
+      if (d < bestD) {
+        bestD = d;
+        best = s;
+      }
+    }
+    return best;
+  }
+
   /* ---------------------------------------------------------------- */
   /* Interaction                                                       */
   /* ---------------------------------------------------------------- */
@@ -373,17 +444,18 @@ export class TrainScene extends Phaser.Scene {
     let bestD = Infinity;
 
     for (const item of this.area.interactables) {
-      const d = Phaser.Math.Distance.Between(px, py, item.x, item.y);
-      const r = item.r ?? 40;
+      const at = this.reachPoint(item.x, item.y);
+      const d = this.interactDistance(px, py, item.x, item.y);
+      const r = item.r ?? 52;
       if (d < r && d < bestD) {
         bestD = d;
-        best = { kind: 'interact', item, x: item.x, y: item.y, label: item.label };
+        best = { kind: 'interact', item, x: at.x, y: at.y, label: item.label };
       }
     }
 
     for (const npc of this.npcs) {
       const d = Phaser.Math.Distance.Between(px, py, npc.sprite.x, npc.sprite.y - 10);
-      if (d < 30 && d < bestD) {
+      if (d < 36 && d < bestD) {
         const c = CHARACTERS.find((ch) => ch.id === npc.id)!;
         bestD = d;
         best = { kind: 'talk', charId: npc.id, x: npc.sprite.x, y: npc.sprite.y - 26, label: `Talk to ${c.name}` };
@@ -427,6 +499,19 @@ export class TrainScene extends Phaser.Scene {
       }
     }
 
+    if (!best) {
+      const table = this.adjacentTable(px, py);
+      if (table) {
+        best = {
+          kind: 'furniture',
+          x: table.x + table.w / 2,
+          y: table.y + 4,
+          label: 'Look over the table',
+          lines: TABLE_LOOK,
+        };
+      }
+    }
+
     return best;
   }
 
@@ -443,6 +528,10 @@ export class TrainScene extends Phaser.Scene {
     }
     if (t.kind === 'talk') {
       this.openDialogue(t.charId);
+      return;
+    }
+    if (t.kind === 'furniture') {
+      this.runLines(t.lines);
       return;
     }
     this.examine(t.item);
@@ -468,17 +557,35 @@ export class TrainScene extends Phaser.Scene {
   }
 
   private changeArea(to: AreaId, side: 'left' | 'right'): void {
+    if (this.crossing) return;
+    this.crossing = true;
     Audio.door();
+    Audio.crossing();
+    Audio.duckMusic(0.4);
     this.overlayOpen = true;
     this.player.setVelocity(0, 0);
-    this.cameras.main.fadeOut(220, 5, 7, 15);
+    this.marker.setVisible(false);
+    this.game.events.emit('prompt', null);
+    const dest = AREAS[to];
+    this.game.events.emit('crossing', { from: this.area.name, to: dest.name, side });
+    this.game.events.emit('overlay-open');
+    this.cameras.main.fadeOut(520, 5, 7, 15);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      const dest = AREAS[to];
-      GameState.x = side === 'right' ? 40 : dest.width - 40;
-      GameState.y = 160;
-      GameState.save();
-      this.buildArea(to);
-      this.overlayOpen = false;
+      this.time.delayedCall(2800, () => {
+        GameState.x = side === 'right' ? 40 : dest.width - 40;
+        GameState.y = 160;
+        GameState.save();
+        this.buildArea(to, { fadeIn: false, announce: false });
+        this.game.events.emit('crossing-done');
+        Audio.duckMusic(1);
+        this.cameras.main.fadeIn(780, 5, 7, 15);
+        this.cameras.main.once('camerafadeincomplete', () => {
+          this.game.events.emit('area-changed', this.area);
+          this.overlayOpen = false;
+          this.crossing = false;
+          this.game.events.emit('overlay-closed');
+        });
+      });
     });
   }
 
@@ -489,6 +596,7 @@ export class TrainScene extends Phaser.Scene {
   private openOverlay(key: string, data?: object): void {
     if (this.overlayOpen) return;
     this.overlayOpen = true;
+    this.marker?.setVisible(false);
     this.persist();
     this.game.events.emit('overlay-open');
     this.scene.pause();
@@ -582,10 +690,11 @@ export class TrainScene extends Phaser.Scene {
     this.player.setDepth(this.player.y);
 
     // Nearest interaction target.
-    const t = this.findTarget();
+    const t = this.overlayOpen ? null : this.findTarget();
     if (t) {
+      const bob = Math.sin(this.shakeT * 8) * 1.2;
       this.marker.setVisible(true);
-      this.marker.setPosition(Math.round(t.x), Math.round(t.y - 10));
+      this.marker.setPosition(Math.round(t.x), Math.round(t.y - 8 + bob));
     } else {
       this.marker.setVisible(false);
     }
@@ -593,6 +702,10 @@ export class TrainScene extends Phaser.Scene {
       this.game.events.emit('prompt', t ? t.label : null);
     }
     this.target = t;
+
+    const pressE = this.keys.E ? Phaser.Input.Keyboard.JustDown(this.keys.E) : false;
+    const pressSpace = this.keys.SPACE ? Phaser.Input.Keyboard.JustDown(this.keys.SPACE) : false;
+    if (pressE || pressSpace) this.tryInteract();
 
     // Scenery and rain scroll.
     for (const s of this.scenerySprites) s.tilePositionX += delta * 0.24;
