@@ -5,7 +5,8 @@ import { label } from '../ui/kit';
 import { GameState } from '../core/state';
 import { Audio } from '../core/audio';
 import { EVIDENCE_BY_ID } from '../data/evidence';
-import { iconKey, charTexture, frameFor } from '../core/art';
+import { iconKey } from '../core/art';
+import { difficultyLabel } from '../core/difficulty';
 import type { Stop } from '../data/story';
 import type { Area } from '../data/areas';
 
@@ -29,7 +30,6 @@ export class HudScene extends Phaser.Scene {
   private stickId: number | null = null;
   private notebookDot!: Phaser.GameObjects.Rectangle;
   private reconCue!: Phaser.GameObjects.Text;
-  private crossingRoot?: Phaser.GameObjects.Container;
 
   constructor() {
     super({ key: SCENE.hud, active: false });
@@ -54,7 +54,7 @@ export class HudScene extends Phaser.Scene {
     // Top-left: carriage name, current stop.
     this.areaText = label(this, 20, 16, '', 15, P.amber4);
     this.stopText = label(this, 20, 36, '', 12, P.slate3);
-    this.objectiveText = label(this, 20, GAME_H - 30, '', 12, P.paperDim, GAME_W - 300);
+    this.objectiveText = label(this, 20, GAME_H - 28, '', 12, P.paperDim, GAME_W - 40);
     this.root.add([this.areaText, this.stopText, this.objectiveText]);
 
     // Bottom-centre interaction prompt. Rectangle + text, not Text.backgroundColor
@@ -91,8 +91,6 @@ export class HudScene extends Phaser.Scene {
     g.on('area-changed', this.onArea, this);
     g.on('overlay-open', this.hide, this);
     g.on('overlay-closed', this.show, this);
-    g.on('crossing', this.onCrossing, this);
-    g.on('crossing-done', this.onCrossingDone, this);
     GameState.events.on('evidence', this.onEvidence, this);
     GameState.events.on('statement', this.onStatement, this);
     GameState.events.on('station', this.onStation, this);
@@ -104,8 +102,6 @@ export class HudScene extends Phaser.Scene {
       g.off('area-changed', this.onArea, this);
       g.off('overlay-open', this.hide, this);
       g.off('overlay-closed', this.show, this);
-      g.off('crossing', this.onCrossing, this);
-      g.off('crossing-done', this.onCrossingDone, this);
       GameState.events.off('evidence', this.onEvidence, this);
       GameState.events.off('statement', this.onStatement, this);
       GameState.events.off('station', this.onStation, this);
@@ -131,7 +127,7 @@ export class HudScene extends Phaser.Scene {
 
   private refresh(): void {
     const stop = GameState.currentStop();
-    this.stopText.setText(`STOP ${stop.index} OF 6  ·  ${stop.name.toUpperCase()}`);
+    this.stopText.setText(`${stop.index}/6  ${stop.name}  ·  ${difficultyLabel(GameState.difficulty)}`);
     this.objectiveText.setText(`▸ ${GameState.objective}`);
     this.notebookDot.setVisible(GameState.unread.size > 0);
     this.reconCue?.setVisible(GameState.has('ready_for_reconstruction'));
@@ -143,64 +139,6 @@ export class HudScene extends Phaser.Scene {
     this.flashCaption(area.name, area.subtitle);
   }
 
-  private onCrossing(info: { from: string; to: string; side: 'left' | 'right' }): void {
-    this.crossingRoot?.destroy(true);
-    const c = this.add.container(0, 0).setAlpha(0).setDepth(2000);
-    const dim = this.add.rectangle(0, 0, GAME_W, GAME_H, toInt(P.night0), 1).setOrigin(0, 0);
-    const rain = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'rain').setOrigin(0, 0).setAlpha(0.7);
-    const leftCar = this.add.rectangle(0, 0, 210, GAME_H, toInt(P.night1)).setOrigin(0, 0);
-    const rightCar = this.add.rectangle(GAME_W, 0, 210, GAME_H, toInt(P.night1)).setOrigin(1, 0);
-    const gap = this.add.rectangle(GAME_W / 2, GAME_H / 2 + 40, 140, 8, toInt(P.slate0)).setOrigin(0.5);
-    const rail = this.add.rectangle(GAME_W / 2, GAME_H / 2 + 52, 220, 2, toInt(P.amber1), 0.45).setOrigin(0.5);
-    const lamp = this.add.rectangle(GAME_W / 2, 88, 10, 16, toInt(P.amber4));
-    const glow = this.add.image(GAME_W / 2, 130, 'lampglow').setScale(1.6).setAlpha(0.45);
-    const title = label(this, 0, 168, 'BETWEEN CARRIAGES', 26, P.amber4);
-    title.setX(GAME_W / 2 - title.width / 2);
-    const sub = label(this, 0, 208, `Walking through to ${info.to}`, 16, P.paperDim);
-    sub.setX(GAME_W / 2 - sub.width / 2);
-    const from = label(this, 28, GAME_H / 2 - 10, info.from.toUpperCase(), 12, P.slate3);
-    const to = label(this, GAME_W - 28, GAME_H / 2 - 10, info.to.toUpperCase(), 12, P.slate3);
-    to.setOrigin(1, 0);
-
-    const walkRight = info.side === 'right';
-    const ori = this.add.sprite(walkRight ? 230 : GAME_W - 230, GAME_H / 2 + 36, charTexture('ori'), frameFor(walkRight ? 2 : 1, 0));
-    ori.setOrigin(0.5, 1).setScale(3);
-    const walkKey = walkRight ? 'ori_walk_right' : 'ori_walk_left';
-    if (this.anims.exists(walkKey)) ori.play(walkKey);
-
-    c.add([dim, rain, glow, leftCar, rightCar, gap, rail, lamp, title, sub, from, to, ori]);
-    this.crossingRoot = c;
-
-    this.tweens.add({ targets: c, alpha: 1, duration: 280 });
-    this.tweens.add({
-      targets: rain,
-      tilePositionX: 90,
-      tilePositionY: 140,
-      duration: 2800,
-      repeat: -1,
-    });
-    this.tweens.add({ targets: [lamp, glow], y: '+=8', duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.tweens.add({
-      targets: ori,
-      x: walkRight ? GAME_W - 230 : 230,
-      duration: 2600,
-      ease: 'Sine.easeInOut',
-    });
-  }
-
-  private onCrossingDone(): void {
-    const c = this.crossingRoot;
-    if (!c) return;
-    this.tweens.add({
-      targets: c,
-      alpha: 0,
-      duration: 420,
-      onComplete: () => {
-        c.destroy(true);
-        if (this.crossingRoot === c) this.crossingRoot = undefined;
-      },
-    });
-  }
 
   private setPrompt(text: string | null): void {
     const visible = !!text;

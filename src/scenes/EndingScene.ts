@@ -6,26 +6,34 @@ import { Audio } from '../core/audio';
 import { GameState } from '../core/state';
 import { EPILOGUE } from '../data/story';
 import { ENCORE, TWIST } from '../data/cinematic';
-import { charTexture, frameFor, portraitKey } from '../core/art';
-import { CHARACTERS_BY_ID } from '../data/characters';
+import { charTexture, frameFor } from '../core/art';
+import { captionBar, drawTrainSide } from '../core/cinemaArt';
+import { speakerName, speakerPortrait } from '../core/speaker';
 import { stopGameplay } from '../core/flow';
 import type { Line } from '../data/types';
 
 export class EndingScene extends Phaser.Scene {
   private wrongCount = 0;
+  private creditsOnly = false;
   private layer!: Phaser.GameObjects.Container;
 
   constructor() {
     super({ key: SCENE.ending });
   }
 
-  init(data: { wrongCount?: number }): void {
+  init(data: { wrongCount?: number; creditsOnly?: boolean }): void {
     this.wrongCount = data?.wrongCount ?? 0;
+    this.creditsOnly = !!data?.creditsOnly;
   }
 
   create(): void {
     this.cameras.main.setBackgroundColor(P.night0);
     this.layer = this.add.container(0, 0);
+    if (this.creditsOnly) {
+      Audio.setTheme('credits');
+      this.playCreditsMarky(true);
+      return;
+    }
     GameState.setFlag('case_solved');
     GameState.save();
     Audio.setTheme('finale');
@@ -49,19 +57,32 @@ export class EndingScene extends Phaser.Scene {
     this.input.keyboard?.once('keydown-SPACE', jump);
     this.input.once('pointerdown', jump);
 
-    // A cut-away of three carriages.
+    const night = this.add.rectangle(0, 0, GAME_W, GAME_H, toInt(P.night1)).setOrigin(0, 0);
+    const hills = this.add.tileSprite(0, 160, GAME_W, 140, 'scenery').setOrigin(0, 0).setAlpha(0.55);
+    const rain = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'rain').setOrigin(0, 0).setAlpha(0.28);
+    const rails = this.add.tileSprite(0, 338, GAME_W, 16, 'cine_rail').setOrigin(0, 0);
+    this.layer.add([night, hills, rain, rails]);
+    this.tweens.add({ targets: rain, tilePositionY: 900, duration: 9000, repeat: -1 });
+
     const carY = 210;
     const carW = 280;
     const cars = ['SLEEPER', 'DINING', 'PASSENGER'];
     const xs = [640, 340, 40];
     cars.forEach((name, i) => {
       const g = this.add.graphics();
+      g.fillStyle(toInt('#1c1420'), 1);
+      g.fillRect(xs[i], carY, carW - 8, 130);
       g.fillStyle(toInt(P.wood0), 1);
-      g.fillRect(xs[i], carY, carW, 130);
-      g.fillStyle(toInt('#3a2a1c'), 1);
-      g.fillRect(xs[i] + 4, carY + 4, carW - 8, 122);
-      g.fillStyle(toInt(P.night1), 1);
-      for (let wx = xs[i] + 18; wx < xs[i] + carW - 30; wx += 52) g.fillRect(wx, carY + 14, 34, 22);
+      g.fillRect(xs[i] + 4, carY + 8, carW - 16, 114);
+      g.fillStyle(toInt(P.amber3), 1);
+      for (let wx = xs[i] + 18; wx < xs[i] + carW - 36; wx += 48) {
+        g.fillRect(wx, carY + 18, 32, 22);
+        g.fillStyle(toInt(P.amber4), 0.28);
+        g.fillRect(wx + 2, carY + 20, 28, 18);
+        g.fillStyle(toInt(P.amber3), 1);
+      }
+      g.fillStyle(toInt('#121018'), 1);
+      g.fillRect(xs[i], carY + 122, carW - 8, 8);
       this.layer.add(g);
       this.layer.add(label(this, xs[i] + 10, carY + 138, name, 12, P.slate3));
     });
@@ -159,12 +180,17 @@ export class EndingScene extends Phaser.Scene {
 
   private playEpilogue(): void {
     const queue: Line[] = [...EPILOGUE];
+    const night = this.add.rectangle(0, 0, GAME_W, GAME_H, toInt(P.night1)).setOrigin(0, 0);
+    const hills = this.add.tileSprite(0, 180, GAME_W, 140, 'scenery').setOrigin(0, 0).setAlpha(0.5);
+    const train = drawTrainSide(this, 200);
+    train.setAlpha(0.28);
+    const plat = this.add.tileSprite(0, 348, GAME_W, 192, 'cine_plat').setOrigin(0, 0).setAlpha(0.7);
     const bg = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'rain').setOrigin(0, 0).setAlpha(0.28);
-    this.layer.add(bg);
+    this.layer.add([night, hills, train, plat, bg]);
     this.tweens.add({ targets: bg, tilePositionY: 4000, tilePositionX: 1600, duration: 40000, repeat: -1 });
 
     const box = panel(this, 60, 300, GAME_W - 120, 190, { fill: P.slate0, border: P.amber2 });
-    const portrait = this.add.image(150, 372, portraitKey('ori', 'neutral')).setScale(2.2);
+    const portrait = this.add.image(150, 372, speakerPortrait('ori')).setScale(2.2);
     const nameT = label(this, 250, 320, '', 16, P.amber4);
     const bodyT = label(this, 250, 350, '', 19, P.paper, GAME_W - 340);
     const arrow = label(this, GAME_W - 100, 456, '▼', 18, P.amber3);
@@ -183,18 +209,12 @@ export class EndingScene extends Phaser.Scene {
         this.playTwist();
         return;
       }
-      if (line.speaker === 'narrator') {
-        portrait.setVisible(false);
-        nameT.setText('');
-        bodyT.setColor(P.paperDim).setFontStyle('italic');
-      } else {
-        portrait.setVisible(true);
-        portrait.setTexture(portraitKey(line.speaker, line.emotion ?? 'neutral'));
-        nameT.setText(
-          (line.speaker === 'ori' ? 'Ori Calder' : CHARACTERS_BY_ID[line.speaker].name).toUpperCase(),
-        );
-        bodyT.setColor(line.speaker === 'ori' ? P.amber4 : P.paper).setFontStyle('normal');
-      }
+      portrait.setVisible(true);
+      portrait.setTexture(speakerPortrait(line.speaker, line.emotion ?? 'neutral'));
+      nameT.setText(speakerName(line.speaker).toUpperCase());
+      bodyT
+        .setColor(line.speaker === 'ori' ? P.amber4 : line.speaker === 'narrator' ? P.paperDim : P.paper)
+        .setFontStyle('normal');
       typer = typewriter(this, bodyT, line.text, 16);
     };
 
@@ -212,11 +232,16 @@ export class EndingScene extends Phaser.Scene {
     this.layer.destroy(true);
     this.layer = this.add.container(0, 0);
     const queue = [...queueIn];
+    const night = this.add.rectangle(0, 0, GAME_W, GAME_H, toInt(P.night1)).setOrigin(0, 0);
+    const hills = this.add.tileSprite(0, 180, GAME_W, 140, 'scenery').setOrigin(0, 0).setAlpha(0.5);
+    const train = drawTrainSide(this, 200);
+    train.setAlpha(0.28);
+    const plat = this.add.tileSprite(0, 348, GAME_W, 192, 'cine_plat').setOrigin(0, 0).setAlpha(0.7);
     const bg = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'rain').setOrigin(0, 0).setAlpha(0.28);
-    this.layer.add(bg);
+    this.layer.add([night, hills, train, plat, bg]);
     this.tweens.add({ targets: bg, tilePositionY: 4000, tilePositionX: 1600, duration: 40000, repeat: -1 });
     const box = panel(this, 60, 300, GAME_W - 120, 190, { fill: P.slate0, border: P.amber2 });
-    const portrait = this.add.image(150, 372, portraitKey('ori', 'neutral')).setScale(2.2);
+    const portrait = this.add.image(150, 372, speakerPortrait('ori')).setScale(2.2);
     const nameT = label(this, 250, 320, '', 16, P.amber4);
     const bodyT = label(this, 250, 350, '', 19, P.paper, GAME_W - 340);
     const arrow = label(this, GAME_W - 100, 456, '▼', 18, P.amber3);
@@ -233,18 +258,12 @@ export class EndingScene extends Phaser.Scene {
         onDone();
         return;
       }
-      if (line.speaker === 'narrator') {
-        portrait.setVisible(false);
-        nameT.setText('');
-        bodyT.setColor(P.paperDim).setFontStyle('italic');
-      } else {
-        portrait.setVisible(true);
-        portrait.setTexture(portraitKey(line.speaker === 'ori' ? 'ori' : line.speaker, line.emotion ?? 'neutral'));
-        nameT.setText(
-          (line.speaker === 'ori' ? 'Ori Calder' : CHARACTERS_BY_ID[line.speaker]?.name ?? 'Marta Vell').toUpperCase(),
-        );
-        bodyT.setColor(line.speaker === 'ori' ? P.amber4 : P.paper).setFontStyle('normal');
-      }
+      portrait.setVisible(true);
+      portrait.setTexture(speakerPortrait(line.speaker, line.emotion ?? 'neutral'));
+      nameT.setText(speakerName(line.speaker).toUpperCase());
+      bodyT
+        .setColor(line.speaker === 'ori' ? P.amber4 : line.speaker === 'narrator' ? P.paperDim : P.paper)
+        .setFontStyle('normal');
       typer = typewriter(this, bodyT, line.text, 16);
     };
     this.input.keyboard?.on('keydown-SPACE', next);
@@ -261,50 +280,48 @@ export class EndingScene extends Phaser.Scene {
     Audio.setTheme('cinematic');
 
     const bg = this.add.rectangle(0, 0, GAME_W, GAME_H, toInt(P.night1)).setOrigin(0, 0);
-    const rain = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'rain').setOrigin(0, 0).setAlpha(0.4);
-    const plat = this.add.rectangle(0, 360, GAME_W, 180, toInt(P.slate0)).setOrigin(0, 0);
-    const lamp = this.add.rectangle(GAME_W / 2, 120, 12, 28, toInt(P.amber4));
-    const glow = this.add.image(GAME_W / 2, 170, 'lampglow').setScale(2.2).setAlpha(0.5);
-    const nadia = this.add.sprite(400, 368, charTexture('nadia'), frameFor(2, 0)).setOrigin(0.5, 1).setScale(2.4);
-    const gran = this.add.rectangle(560, 368, 16, 40, toInt('#8a6a4a')).setOrigin(0.5, 1);
-    const granHair = this.add.rectangle(560, 330, 20, 10, toInt('#d8c4a0')).setOrigin(0.5, 1);
-    const stamp = label(this, GAME_W / 2, 36, 'THE TWIST', 14, P.violet2);
-    stamp.setOrigin(0.5, 0.5);
-    const cap = label(
+    const hills = this.add.tileSprite(0, 180, GAME_W, 140, 'scenery').setOrigin(0, 0).setAlpha(0.85);
+    const house = this.add.image(720, 248, 'cine_house').setScale(3).setOrigin(0.5, 1);
+    const rain = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'rain').setOrigin(0, 0).setAlpha(0.45);
+    const train = drawTrainSide(this, 200);
+    train.setAlpha(0.35);
+    const plat = this.add.tileSprite(0, 348, GAME_W, 192, 'cine_plat').setOrigin(0, 0);
+    const edge = this.add.rectangle(0, 348, GAME_W, 4, toInt(P.amber2), 0.55).setOrigin(0, 0);
+    const lamp = this.add.image(GAME_W / 2, 348, 'cine_lamp').setScale(3).setOrigin(0.5, 1);
+    const glow = this.add.image(GAME_W / 2, 250, 'lampglow').setScale(2.8).setAlpha(0.55);
+    const nadia = this.add.sprite(400, 360, charTexture('nadia'), frameFor(2, 0)).setOrigin(0.5, 1).setScale(3);
+    const gran = this.add.sprite(560, 360, charTexture('marta'), frameFor(1, 0)).setOrigin(0.5, 1).setScale(3);
+    const vcase = this.add.image(590, 356, 'cine_case').setScale(2.4).setOrigin(0.5, 1);
+    const bar = captionBar(
       this,
-      GAME_W / 2,
-      68,
-      'Someone is already under the lamp. Look — the film will wait.',
-      16,
-      P.paper,
-      720,
+      8,
+      'THE TWIST',
+      'Someone is already under the lamp. Click the house, Gran, and Nadia.',
     );
-    cap.setOrigin(0.5, 0.5);
-    this.layer.add([bg, rain, plat, glow, lamp, nadia, gran, granHair, stamp, cap]);
+    this.layer.add([bg, hills, house, rain, train, plat, edge, glow, lamp, nadia, gran, vcase, bar.root]);
     this.tweens.add({ targets: rain, tilePositionY: 800, duration: 8000, repeat: -1 });
-    this.tweens.add({ targets: [lamp, glow], y: '+=6', duration: 900, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: [lamp, glow], y: '+=5', duration: 900, yoyo: true, repeat: -1 });
 
     const found: string[] = [];
     const spot = (x: number, y: number, w: number, h: number, id: string, text: string) => {
       const z = this.add.zone(x, y, w, h).setOrigin(0, 0).setInteractive({ useHandCursor: true });
-      const rim = this.add.rectangle(x + w / 2, y + h / 2, w, h).setStrokeStyle(1, toInt(P.amber3), 0.4);
-      this.layer.add([rim, z]);
+      const glint = this.add.image(x + w / 2, y + 8, 'glint').setScale(1.3);
+      this.tweens.add({ targets: glint, alpha: 0.25, duration: 700, yoyo: true, repeat: -1 });
+      this.layer.add([glint, z]);
       z.on('pointerdown', () => {
         if (found.includes(id)) return;
         found.push(id);
         Audio.select();
-        cap.setText(text);
+        bar.body.setText(text);
+        glint.setTint(toInt(P.slate3));
         if (found.length >= 2) {
           this.time.delayedCall(800, () => this.playLines(TWIST, () => this.showMenu()));
         }
       });
     };
-    spot(470, 80, 120, 80, 'lamp', 'The kitchen light on the hill is dark. She is not up there.');
-    spot(520, 300, 80, 80, 'gran', 'Marta Vell. Retired steward. She has been on this platform since the tunnel.');
-    spot(340, 300, 80, 80, 'nadia', 'Nadia is not surprised. She was walking toward this lamp the whole night.');
-    const hint = label(this, GAME_W / 2, 500, 'Click the lamp  ·  Click the woman waiting  ·  Click Nadia', 13, P.slate3);
-    hint.setOrigin(0.5, 0.5);
-    this.layer.add(hint);
+    spot(670, 200, 100, 70, 'lamp', 'The kitchen light on the hill is dark. She is not up there.');
+    spot(520, 280, 80, 90, 'gran', 'Marta Vell. Retired steward. She has been on this platform since the tunnel.');
+    spot(360, 280, 80, 90, 'nadia', 'Nadia is not surprised. She was walking toward this lamp the whole night.');
   }
 
   private playEncore(): void {
@@ -312,15 +329,18 @@ export class EndingScene extends Phaser.Scene {
     this.playLines(ENCORE, () => this.playCreditsMarky());
   }
 
-  private playCreditsMarky(): void {
+  private playCreditsMarky(fromTitle = false): void {
     this.input.keyboard?.removeAllListeners();
     this.input.removeAllListeners();
     this.layer.destroy(true);
     this.layer = this.add.container(0, 0);
     Audio.setTheme('credits');
 
+    const night = this.add.rectangle(0, 0, GAME_W, GAME_H, toInt(P.night1)).setOrigin(0, 0);
+    const train = drawTrainSide(this, 360);
+    train.setAlpha(0.4);
     const bg = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'rain').setOrigin(0, 0).setAlpha(0.22);
-    this.layer.add(bg);
+    this.layer.add([night, train, bg]);
     this.tweens.add({ targets: bg, tilePositionY: 6000, duration: 50000, repeat: -1 });
 
     const lines = [
@@ -354,7 +374,12 @@ export class EndingScene extends Phaser.Scene {
       if (closed) return;
       closed = true;
       this.tweens.killAll();
-      this.showMenu(true);
+      if (fromTitle) {
+        stopGameplay(this, SCENE.title);
+        this.scene.start(SCENE.title);
+      } else {
+        this.showMenu(true);
+      }
     };
 
     this.tweens.add({
@@ -378,8 +403,11 @@ export class EndingScene extends Phaser.Scene {
     this.layer.destroy(true);
     this.layer = this.add.container(0, 0);
 
+    const night = this.add.rectangle(0, 0, GAME_W, GAME_H, toInt(P.night1)).setOrigin(0, 0);
+    const train = drawTrainSide(this, 400);
+    train.setAlpha(0.35);
     const bg = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'rain').setOrigin(0, 0).setAlpha(0.25);
-    this.layer.add(bg);
+    this.layer.add([night, train, bg]);
     this.tweens.add({ targets: bg, tilePositionY: 4000, duration: 40000, repeat: -1 });
 
     const t = label(this, GAME_W / 2, 110, 'CASE CLOSED', 46, P.amber4);

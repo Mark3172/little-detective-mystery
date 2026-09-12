@@ -7,6 +7,8 @@
 
 export type AreaId = 'passenger' | 'dining' | 'sleeper' | 'baggage';
 
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
 export type CharacterId = 'bram' | 'ilse' | 'kass' | 'nadia';
 
 export type Emotion =

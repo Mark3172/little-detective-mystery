@@ -7,7 +7,7 @@ export const VIEW_H = GAME_H / WORLD_ZOOM;
 
 export const PLAYER_SPEED = 78;
 
-export const FONT = '"Courier New", Courier, monospace';
+export const FONT = 'Consolas, "Courier New", monospace';
 
 export const SAVE_KEY = 'midnight-express-save-v1';
 export const SETTINGS_KEY = 'midnight-express-settings-v1';
@@ -25,6 +25,7 @@ export const SCENE = {
   accusation: 'Accusation',
   ending: 'Ending',
   pause: 'Pause',
+  crossing: 'Crossing',
 } as const;
 
 export type MusicTheme = 'explore' | 'cinematic' | 'finale' | 'credits';

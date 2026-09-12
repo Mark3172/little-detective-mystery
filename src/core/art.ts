@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { P } from './palette';
 import { makeSheet, makeTexture, px, rng, speckle, type Ctx } from './pixel';
+import { buildCinemaTextures } from './cinemaArt';
 import { CHARACTERS } from '../data/characters';
+import { EXTRA_PEOPLE } from '../data/extras';
 import { EVIDENCE } from '../data/evidence';
 import type { Character, Emotion } from '../data/types';
 
@@ -17,6 +19,25 @@ const ORI: Character['palette'] = {
 };
 
 const ORI_FACE: Character['face'] = { hairStyle: 'short', height: 'small' };
+
+/** Marky — glasses, short black hair, black sweater. From the player's photo. */
+const NARRATOR_PAL: Character['palette'] = {
+  skin: '#e8c4a4',
+  hair: '#14110f',
+  coat: '#161616',
+  coatDark: '#0a0a0a',
+  accent: '#2a2a2e',
+};
+const NARRATOR_FACE: Character['face'] = { hairStyle: 'short', glasses: true, height: 'medium' };
+
+const MARTA_PAL: Character['palette'] = {
+  skin: '#d4b08a',
+  hair: '#e4d2b0',
+  coat: '#5c4030',
+  coatDark: '#3a281c',
+  accent: '#c4a060',
+};
+const MARTA_FACE: Character['face'] = { hairStyle: 'bun', height: 'medium' };
 
 /* ================================================================== */
 /* Tiles and atmosphere                                                */
@@ -247,6 +268,11 @@ function drawCharFrame(
     px(ctx, ox + 9, headY + 3, 1, 2, P.ink);
   }
 
+  if (face.glasses && dir !== 3) {
+    px(ctx, ox + 5, headY + 2, 6, 3, '#2a2a30');
+    px(ctx, ox + 6, headY + 3, 2, 1, 'rgba(180,220,255,0.25)');
+    px(ctx, ox + 8, headY + 3, 2, 1, 'rgba(180,220,255,0.25)');
+  }
   if (face.scarf) px(ctx, ox + 4, bodyY - 1, 8, 2, P.red);
 }
 
@@ -257,7 +283,10 @@ function sheetKey(id: string): string {
 export function buildCharacterSheets(scene: Phaser.Scene): void {
   const all: { id: string; pal: Character['palette']; face: Character['face'] }[] = [
     { id: 'ori', pal: ORI, face: ORI_FACE },
+    { id: 'narrator', pal: NARRATOR_PAL, face: NARRATOR_FACE },
+    { id: 'marta', pal: MARTA_PAL, face: MARTA_FACE },
     ...CHARACTERS.map((c) => ({ id: c.id, pal: c.palette, face: c.face })),
+    ...EXTRA_PEOPLE.map((c) => ({ id: c.id, pal: c.palette, face: c.face })),
   ];
   for (const entry of all) {
     makeSheet(scene, sheetKey(entry.id), CHAR_FRAME_W, CHAR_FRAME_H, 12, (ctx) => {
@@ -504,10 +533,35 @@ export function portraitKey(id: string, emo: Emotion): string {
   return `pt_${id}_${emo}`;
 }
 
+function drawMarkyPortrait(ctx: Ctx, emo: Emotion): void {
+  const pal = NARRATOR_PAL;
+  drawPortrait(ctx, pal, { ...NARRATOR_FACE, glasses: false }, emo);
+  // Black crewneck — no gold trim.
+  px(ctx, 9, 50, 46, 14, pal.coat);
+  px(ctx, 9, 50, 46, 2, pal.coatDark);
+  px(ctx, 28, 48, 8, 4, pal.skin);
+  px(ctx, 27, 50, 10, 3, pal.coat);
+  // Tiny figure on the sweater, like the shirt print.
+  px(ctx, 30, 54, 4, 3, '#e8d2b0');
+  px(ctx, 29, 57, 6, 5, '#6b4a32');
+  px(ctx, 30, 57, 4, 1, '#c45a4a');
+  // Round black glasses on top of the generic frames.
+  px(ctx, 22, 27, 9, 8, '#1a1a20');
+  px(ctx, 24, 29, 5, 4, 'rgba(200,230,255,0.18)');
+  px(ctx, 33, 27, 9, 8, '#1a1a20');
+  px(ctx, 35, 29, 5, 4, 'rgba(200,230,255,0.18)');
+  px(ctx, 31, 30, 2, 1, '#1a1a20');
+  // Short bangs over the brow.
+  px(ctx, 20, 14, 24, 6, pal.hair);
+  px(ctx, 22, 18, 8, 3, pal.hair);
+}
+
 export function buildPortraits(scene: Phaser.Scene): void {
   const all: { id: string; pal: Character['palette']; face: Character['face'] }[] = [
     { id: 'ori', pal: ORI, face: ORI_FACE },
+    { id: 'marta', pal: MARTA_PAL, face: MARTA_FACE },
     ...CHARACTERS.map((c) => ({ id: c.id, pal: c.palette, face: c.face })),
+    ...EXTRA_PEOPLE.map((c) => ({ id: c.id, pal: c.palette, face: c.face })),
   ];
   for (const entry of all) {
     for (const emo of EMOTIONS) {
@@ -515,6 +569,9 @@ export function buildPortraits(scene: Phaser.Scene): void {
         drawPortrait(ctx, entry.pal, entry.face, emo),
       );
     }
+  }
+  for (const emo of EMOTIONS) {
+    makeTexture(scene, portraitKey('narrator', emo), 64, 64, (ctx) => drawMarkyPortrait(ctx, emo));
   }
 }
 
@@ -667,4 +724,5 @@ export function buildAllArt(scene: Phaser.Scene): void {
   buildPortraits(scene);
   buildIcons(scene);
   buildUiTextures(scene);
+  buildCinemaTextures(scene);
 }

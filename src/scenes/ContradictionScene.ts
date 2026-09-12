@@ -64,7 +64,7 @@ export class ContradictionScene extends Phaser.Scene {
       this.tweens.add({ targets: quote, alpha: 0.28, duration: 300 });
       this.tweens.add({ targets: shards, alpha: 0, duration: 1500, delay: 400 });
 
-      const slam = label(this, GAME_W / 2, 250, 'CONTRADICTION', 74, P.redSoft);
+      const slam = label(this, GAME_W / 2, 250, 'CONTRADICTION', 42, P.redSoft);
       slam.setOrigin(0.5, 0.5).setScale(3).setAlpha(0).setDepth(30);
       slam.setShadow(0, 0, P.red, 18, true, true);
       this.tweens.add({ targets: slam, scale: 1, alpha: 1, duration: 260, ease: 'Back.easeIn' });

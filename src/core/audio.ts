@@ -60,7 +60,7 @@ class AudioEngine {
     if (!this.ctx || !this.master) return;
     const ctx = this.ctx;
     this.ambienceGain = ctx.createGain();
-    this.ambienceGain.gain.value = 0.32;
+    this.ambienceGain.gain.value = 0.12;
     this.ambienceGain.connect(this.master);
 
     const buf = this.noiseBuffer(3);
@@ -74,21 +74,9 @@ class AudioEngine {
     lp.type = 'lowpass';
     lp.frequency.value = 150;
     const rg = ctx.createGain();
-    rg.gain.value = 0.9;
+    rg.gain.value = 0.35;
     rumble.connect(lp).connect(rg).connect(this.ambienceGain);
     rumble.start();
-
-    // Rain hiss.
-    const hiss = ctx.createBufferSource();
-    hiss.buffer = buf;
-    hiss.loop = true;
-    const hp = ctx.createBiquadFilter();
-    hp.type = 'highpass';
-    hp.frequency.value = 3200;
-    const hg = ctx.createGain();
-    hg.gain.value = 0.06;
-    hiss.connect(hp).connect(hg).connect(this.ambienceGain);
-    hiss.start();
 
     // Bogie clatter, roughly every 1.1 s.
     const tick = () => {
@@ -285,26 +273,7 @@ class AudioEngine {
     lp.type = 'lowpass';
     lp.frequency.value = 1650;
     this.musicGain.connect(lp).connect(this.master);
-    this.musicGain.gain.setTargetAtTime(0.26, ctx.currentTime, 1.4);
-
-    const drone = (freq: number, vol: number) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      const g = ctx.createGain();
-      g.gain.value = vol;
-      const lfo = ctx.createOscillator();
-      lfo.frequency.value = 0.07 + freq / 4000;
-      const lfoG = ctx.createGain();
-      lfoG.gain.value = vol * 0.35;
-      lfo.connect(lfoG).connect(g.gain);
-      osc.connect(g).connect(this.musicGain!);
-      osc.start();
-      lfo.start();
-    };
-    drone(110, 0.11);
-    drone(164.81, 0.055);
-    drone(220, 0.03);
+    this.musicGain.gain.setTargetAtTime(0.18, ctx.currentTime, 1.4);
 
     this.musicGen += 1;
     this.playMysteryPhrase(this.musicGen);

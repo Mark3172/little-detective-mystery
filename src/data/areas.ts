@@ -1,4 +1,4 @@
-import type { AreaId, Effects, Line } from './types';
+import type { AreaId, Difficulty, Effects, Line } from './types';
 
 export interface Solid {
   x: number;
@@ -36,6 +36,10 @@ export interface Interactable {
   };
   /** Repeatable flavour once its effects have fired. */
   exhaustedLines?: Line[];
+  /** Hide the amber sparkle on these difficulties. The item is still searchable. */
+  hideGlintOn?: Difficulty[];
+  /** Only placed on these difficulties. */
+  onlyOn?: Difficulty[];
 }
 
 export interface Area {
@@ -152,6 +156,7 @@ const passenger: Area = {
       label: "Nadia's book bag",
       x: 180,
       y: 200,
+      hideGlintOn: ['hard'],
       requiresFlags: ['know_costume'],
       lockedLines: [{ speaker: 'narrator', text: 'Her bag. Not without a reason, and not without asking.' }],
       lines: [
@@ -167,6 +172,7 @@ const passenger: Area = {
       label: 'Two dozing passengers',
       x: 500,
       y: 200,
+      onlyOn: ['easy', 'normal'],
       requiresFlags: ['nadia_alibi'],
       lockedLines: [{ speaker: 'narrator', text: 'Two passengers asleep under one coat. Let them be, for now.' }],
       lines: [
@@ -179,10 +185,28 @@ const passenger: Area = {
       exhaustedLines: [{ speaker: 'narrator', text: 'Asleep again already.' }],
     },
     {
+      id: 'aisle_man',
+      label: 'Man across the aisle',
+      x: 500,
+      y: 200,
+      onlyOn: ['hard'],
+      requiresFlags: ['nadia_alibi'],
+      lockedLines: [{ speaker: 'narrator', text: 'He has his hat over his face. Ask the girl first.' }],
+      lines: [
+        { speaker: 'narrator', text: 'He lifts the hat a little. He does not like questions.' },
+        { speaker: 'ori', emotion: 'neutral', text: 'The girl in seat twelve. After the lights.' },
+        { speaker: 'narrator', text: '"Reading. Same book. I saw her at five to twelve. That is all I give you."' },
+        { speaker: 'ori', emotion: 'neutral', text: '(23:55. Seat twelve. One witness who will not say more.)' },
+      ],
+      effects: { flags: ['know_nadia_seen'] },
+      exhaustedLines: [{ speaker: 'narrator', text: 'The hat is back down.' }],
+    },
+    {
       id: 'rack',
       label: 'Luggage rack',
       x: 300,
       y: 60,
+      hideGlintOn: ['normal', 'hard'],
       lines: [
         { speaker: 'narrator', text: 'Hat boxes, a cello case, a birdcage with a small bird that looks annoyed.' },
         { speaker: 'ori', emotion: 'neutral', text: 'No grey coat up here.' },
@@ -193,6 +217,7 @@ const passenger: Area = {
       label: 'Rain-streaked window',
       x: 620,
       y: 66,
+      hideGlintOn: ['normal', 'hard'],
       lines: [
         { speaker: 'narrator', text: 'Rain runs sideways on the glass. Outside: dark fields and a few farm lights.' },
         { speaker: 'ori', emotion: 'neutral', text: 'Nobody stepped off this train. Not at seventy miles an hour, in the rain, with a cane.' },
@@ -234,6 +259,7 @@ const dining: Area = {
       label: 'Behind the service counter',
       x: 300,
       y: 96,
+      hideGlintOn: ['hard'],
       lines: [
         { speaker: 'narrator', text: 'Behind the counter, under a folded cloth: a tin heavy with coins.' },
         { speaker: 'narrator', text: 'On top of it, an opened letter. Cormery Cooking School. "...pleased to offer you a place..."' },
@@ -248,6 +274,7 @@ const dining: Area = {
       label: 'Receipt spike',
       x: 400,
       y: 96,
+      hideGlintOn: ['normal', 'hard'],
       lines: [
         { speaker: 'narrator', text: 'A steel spike full of tonight\'s receipts. You look at the last few.' },
         { speaker: 'narrator', text: 'One hot chocolate. 23:47. Signed in a hurry: T.K.' },
@@ -261,6 +288,7 @@ const dining: Area = {
       label: 'Counter radio',
       x: 240,
       y: 96,
+      hideGlintOn: ['normal', 'hard'],
       lines: [
         { speaker: 'narrator', text: 'An old radio with a cracked dial. The plug is lying loose on the shelf.' },
         { speaker: 'ori', emotion: 'neutral', text: 'Not plugged in. Not tonight, not for a long time.' },
@@ -272,6 +300,7 @@ const dining: Area = {
       label: 'Floor by the counter',
       x: 340,
       y: 130,
+      hideGlintOn: ['normal', 'hard'],
       lines: [
         { speaker: 'narrator', text: 'A smear of pale powder on the floor, the size of a thumbprint. It smells a little like pine.' },
         { speaker: 'ori', emotion: 'neutral', text: '(Somebody stood here. Somebody who carries rosin.)' },
@@ -283,6 +312,7 @@ const dining: Area = {
       label: 'Window over the tables',
       x: 620,
       y: 90,
+      hideGlintOn: ['normal', 'hard'],
       lines: [
         { speaker: 'narrator', text: 'The glass is fogged from the kitchen. Someone drew a music note in it and half rubbed it out.' },
       ],
@@ -349,6 +379,7 @@ const sleeper: Area = {
     },
     {
       id: 'comp4hook',
+      hideGlintOn: ['hard'],
       label: 'Coat hook',
       x: 218,
       y: 68,
@@ -363,6 +394,7 @@ const sleeper: Area = {
     },
     {
       id: 'comp4floor',
+      hideGlintOn: ['hard'],
       label: 'Under the bunk',
       x: 214,
       y: 112,
@@ -377,6 +409,7 @@ const sleeper: Area = {
     },
     {
       id: 'comp4window',
+      hideGlintOn: ['normal', 'hard'],
       label: 'Room window',
       x: 290,
       y: 62,
@@ -389,6 +422,7 @@ const sleeper: Area = {
     },
     {
       id: 'corridorfloor',
+      hideGlintOn: ['hard'],
       label: 'Corridor floor',
       x: 190,
       y: 170,
@@ -404,7 +438,8 @@ const sleeper: Area = {
     },
     {
       id: 'hamper',
-      label: 'Linen hamper',
+      hideGlintOn: ['normal', 'hard'],
+      label: 'Laundry basket',
       x: 57,
       y: 162,
       lines: [
@@ -427,6 +462,7 @@ const sleeper: Area = {
     },
     {
       id: 'roster',
+      hideGlintOn: ['normal', 'hard'],
       label: 'Roster board',
       x: 100,
       y: 136,
@@ -474,6 +510,7 @@ const baggage: Area = {
   interactables: [
     {
       id: 'crate',
+      hideGlintOn: ['hard'],
       label: 'Tour-company crate',
       x: 325,
       y: 124,
@@ -487,6 +524,7 @@ const baggage: Area = {
     },
     {
       id: 'behindcrate',
+      hideGlintOn: ['normal', 'hard'],
       label: 'Gap behind the crate',
       x: 385,
       y: 100,
@@ -500,6 +538,7 @@ const baggage: Area = {
     },
     {
       id: 'nook',
+      hideGlintOn: ['hard'],
       label: 'Staff nook',
       x: 620,
       y: 100,

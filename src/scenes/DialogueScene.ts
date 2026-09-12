@@ -4,7 +4,8 @@ import { P, toInt } from '../core/palette';
 import { button, label, panel, scrim, typewriter, type Button } from '../ui/kit';
 import { GameState } from '../core/state';
 import { Audio } from '../core/audio';
-import { portraitKey, iconKey } from '../core/art';
+import { iconKey } from '../core/art';
+import { speakerName, speakerPortrait } from '../core/speaker';
 import { CHARACTERS_BY_ID } from '../data/characters';
 import { EVIDENCE_BY_ID } from '../data/evidence';
 import type { Character, Effects, Emotion, Line, Topic } from '../data/types';
@@ -67,11 +68,11 @@ export class DialogueScene extends Phaser.Scene {
     pf.fillStyle(toInt(P.slate1), 1);
     pf.fillRect(BOX_X + 20, BOX_Y - 38, 144, 144);
 
-    this.portrait = this.add.image(BOX_X + 92, BOX_Y + 34, portraitKey('ori', 'neutral'));
+    this.portrait = this.add.image(BOX_X + 92, BOX_Y + 34, speakerPortrait('ori'));
     this.portrait.setScale(2.25);
 
-    this.namePlate = label(this, BOX_X + 190, BOX_Y - 26, '', 17, P.amber4);
-    this.bodyText = label(this, TEXT_X, BOX_Y + 22, '', 19, P.paper, TEXT_W);
+    this.namePlate = label(this, BOX_X + 190, BOX_Y - 26, '', 16, P.amber4, TEXT_W);
+    this.bodyText = label(this, TEXT_X, BOX_Y + 22, '', 17, P.paper, TEXT_W);
     this.nextArrow = label(this, BOX_X + BOX_W - 42, BOX_Y + BOX_H - 34, '▼', 18, P.amber3);
     this.nextArrow.setVisible(false);
     this.tweens.add({ targets: this.nextArrow, y: this.nextArrow.y + 5, duration: 620, yoyo: true, repeat: -1 });
@@ -124,22 +125,13 @@ export class DialogueScene extends Phaser.Scene {
     const speaker = line.speaker;
     const emo: Emotion = line.emotion ?? 'neutral';
 
-    if (speaker === 'narrator') {
-      this.portrait.setVisible(false);
-      this.namePlate.setText('');
-      this.bodyText.setColor(P.paperDim);
-      this.bodyText.setFontStyle('italic');
-    } else {
-      this.portrait.setVisible(true);
-      this.portrait.setTexture(portraitKey(speaker, emo));
-      const name = speaker === 'ori' ? 'Ori Calder' : CHARACTERS_BY_ID[speaker]?.name ?? speaker;
-      this.namePlate.setText(name.toUpperCase());
-      this.bodyText.setColor(speaker === 'ori' ? P.amber4 : P.paper);
-      this.bodyText.setFontStyle('normal');
-      // A small nudge so the portrait feels alive on every line.
-      this.portrait.setScale(2.18);
-      this.tweens.add({ targets: this.portrait, scale: 2.25, duration: 140, ease: 'Back.easeOut' });
-    }
+    this.portrait.setVisible(true);
+    this.portrait.setTexture(speakerPortrait(speaker, emo));
+    this.namePlate.setText(speakerName(speaker).toUpperCase());
+    this.bodyText.setFontStyle('normal');
+    this.bodyText.setColor(speaker === 'ori' ? P.amber4 : speaker === 'narrator' ? P.paperDim : P.paper);
+    this.portrait.setScale(2.18);
+    this.tweens.add({ targets: this.portrait, scale: 2.25, duration: 140, ease: 'Back.easeOut' });
 
     if (line.punch) {
       this.cameras.main.shake(180, 0.006);
@@ -216,8 +208,8 @@ export class DialogueScene extends Phaser.Scene {
     this.nextArrow.setVisible(false);
     this.typer?.destroy();
     this.portrait.setVisible(true);
-    this.portrait.setTexture(portraitKey(this.character.id, 'neutral'));
-    this.namePlate.setText(`${this.character.name.toUpperCase()}  ·  ${this.character.role}`);
+    this.portrait.setTexture(speakerPortrait(this.character.id));
+    this.namePlate.setText(this.character.name.toUpperCase());
     this.bodyText.setText('');
     this.hintLine.setText('Click a question   ·   Esc to walk away');
 

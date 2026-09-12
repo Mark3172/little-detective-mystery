@@ -1,14 +1,15 @@
 import Phaser from 'phaser';
 import { SAVE_KEY, SETTINGS_KEY } from './config';
 import { STOPS } from '../data/story';
-import type { AreaId, CharacterId, Effects, MomentId } from '../data/types';
+import type { AreaId, CharacterId, Difficulty, Effects, MomentId } from '../data/types';
 
 export interface ReconAssignment {
   [character: string]: Partial<Record<MomentId, AreaId>>;
 }
 
 interface SaveShape {
-  version: 1;
+  version: 1 | 2;
+  difficulty?: Difficulty;
   flags: string[];
   evidence: string[];
   statements: string[];
@@ -52,6 +53,7 @@ class GameStateClass {
   objective = DEFAULT_OBJECTIVE;
   recon: ReconAssignment = {};
   playedMs = 0;
+  difficulty: Difficulty = 'easy';
 
   /** Evidence ids the player has not yet opened in the notebook. */
   unread = new Set<string>();
@@ -76,6 +78,10 @@ class GameStateClass {
     this.playedMs = 0;
     this.unread.clear();
     this.events.emit('changed');
+  }
+
+  setDifficulty(d: Difficulty): void {
+    this.difficulty = d;
   }
 
   /* ---------------------------------------------------------------- */
@@ -181,7 +187,8 @@ class GameStateClass {
 
   toJSON(): SaveShape {
     return {
-      version: 1,
+      version: 2,
+      difficulty: this.difficulty,
       flags: [...this.flags],
       evidence: [...this.evidence],
       statements: [...this.statements],
@@ -219,8 +226,9 @@ class GameStateClass {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return false;
       const data = JSON.parse(raw) as SaveShape;
-      if (data.version !== 1) return false;
+      if (data.version !== 1 && data.version !== 2) return false;
       this.reset();
+      this.difficulty = data.difficulty ?? 'easy';
       data.flags.forEach((f) => this.flags.add(f));
       this.evidence = [...data.evidence];
       this.statements = [...data.statements];

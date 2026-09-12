@@ -7,12 +7,14 @@ import { Audio } from '../core/audio';
 import { AREAS, WALL_BOTTOM, WALL_TOP, type Area, type Interactable, type Solid } from '../data/areas';
 import { CHARACTERS } from '../data/characters';
 import { PROLOGUE } from '../data/story';
-import { OPENING_BRIEF } from '../data/cinematic';
+import { openingBrief } from '../data/cinematic';
+import { extrasFor } from '../data/extras';
 import type { AreaId, Line } from '../data/types';
 
 type Target =
   | { kind: 'interact'; item: Interactable; x: number; y: number; label: string }
   | { kind: 'talk'; charId: string; x: number; y: number; label: string }
+  | { kind: 'extra'; extraId: string; x: number; y: number; label: string }
   | { kind: 'door'; to: AreaId; side: 'left' | 'right'; x: number; y: number; label: string; locked?: string }
   | { kind: 'furniture'; x: number; y: number; label: string; lines: Line[] };
 
@@ -48,6 +50,7 @@ export class TrainScene extends Phaser.Scene {
   private pendingBriefing = false;
   private saveT = 0;
   private crossing = false;
+  private pendingCross?: { to: AreaId; side: 'left' | 'right' };
 
   constructor() {
     super(SCENE.train);
@@ -110,6 +113,7 @@ export class TrainScene extends Phaser.Scene {
       this.game.events.off('hud-recon', this.openReconstruction, this);
       this.game.events.off('hud-pause', this.openPause, this);
       this.game.events.off('overlay-closed', this.onOverlayClosed, this);
+      this.game.events.off('crossing-finished', this.finishCrossing, this);
     });
 
     if (this.pendingPrologue) {
@@ -117,7 +121,7 @@ export class TrainScene extends Phaser.Scene {
       this.time.delayedCall(300, () => this.runLines(PROLOGUE));
     } else if (this.pendingBriefing) {
       this.pendingBriefing = false;
-      this.time.delayedCall(400, () => this.runLines(OPENING_BRIEF));
+      this.time.delayedCall(400, () => this.runLines(openingBrief(GameState.difficulty)));
     }
   }
 
@@ -126,7 +130,7 @@ export class TrainScene extends Phaser.Scene {
   /* ---------------------------------------------------------------- */
 
   private buildAnimations(): void {
-    const ids = ['ori', ...CHARACTERS.map((c) => c.id)];
+    const ids = ['ori', ...CHARACTERS.map((c) => c.id), ...extrasFor(GameState.difficulty).map((e) => e.id)];
     const dirs = ['down', 'left', 'right', 'up'];
     for (const id of ids) {
       for (let d = 0; d < 4; d++) {
@@ -237,7 +241,8 @@ export class TrainScene extends Phaser.Scene {
 
     // Search sparkles sit on the walkable side of furniture so they are not
     // trapped inside a collider the player cannot step onto.
-    for (const item of this.area.interactables) {
+    for (const item of this.liveItems()) {
+      if (item.hideGlintOn?.includes(GameState.difficulty)) continue;
       const done = GameState.interactPass(item.id) > 0;
       const at = this.reachPoint(item.x, item.y);
       const dot = this.add.image(at.x, at.y, 'glint').setDepth(at.y + 2);
@@ -268,6 +273,14 @@ export class TrainScene extends Phaser.Scene {
       this.worldLayer.add(spr);
       this.npcs.push({ id: c.id, sprite: spr });
       this.tweens.add({ targets: spr, y: c.y - 1, duration: 1400 + Math.random() * 500, yoyo: true, repeat: -1 });
+    }
+
+    for (const extra of extrasFor(GameState.difficulty, id)) {
+      const spr = this.add.sprite(extra.x, extra.y, charTexture(extra.id), frameFor(0, 0)).setOrigin(0.5, 1);
+      spr.setDepth(extra.y);
+      this.worldLayer.add(spr);
+      this.npcs.push({ id: `extra:${extra.id}`, sprite: spr });
+      this.tweens.add({ targets: spr, y: extra.y - 1, duration: 1400 + Math.random() * 500, yoyo: true, repeat: -1 });
     }
 
     // Doors.
@@ -450,7 +463,7 @@ export class TrainScene extends Phaser.Scene {
     let best: Target | null = null;
     let bestD = Infinity;
 
-    for (const item of this.area.interactables) {
+    for (const item of this.liveItems()) {
       const at = this.reachPoint(item.x, item.y);
       const d = this.interactDistance(px, py, item.x, item.y);
       const r = item.r ?? 52;
@@ -463,6 +476,20 @@ export class TrainScene extends Phaser.Scene {
     for (const npc of this.npcs) {
       const d = Phaser.Math.Distance.Between(px, py, npc.sprite.x, npc.sprite.y - 10);
       if (d < 36 && d < bestD) {
+        if (npc.id.startsWith('extra:')) {
+          const extraId = npc.id.slice(6);
+          const extra = extrasFor(GameState.difficulty).find((e) => e.id === extraId);
+          if (!extra) continue;
+          bestD = d;
+          best = {
+            kind: 'extra',
+            extraId,
+            x: npc.sprite.x,
+            y: npc.sprite.y - 26,
+            label: `Talk to ${extra.name}`,
+          };
+          continue;
+        }
         const c = CHARACTERS.find((ch) => ch.id === npc.id)!;
         bestD = d;
         best = { kind: 'talk', charId: npc.id, x: npc.sprite.x, y: npc.sprite.y - 26, label: `Talk to ${c.name}` };
@@ -537,6 +564,18 @@ export class TrainScene extends Phaser.Scene {
       this.openDialogue(t.charId);
       return;
     }
+    if (t.kind === 'extra') {
+      const extra = extrasFor(GameState.difficulty).find((e) => e.id === t.extraId);
+      if (!extra) return;
+      const first = GameState.interactPass(`extra_${extra.id}`) === 0;
+      if (first) {
+        GameState.bumpInteract(`extra_${extra.id}`);
+        this.runLines(extra.lines, extra.effects);
+      } else {
+        this.runLines(extra.exhaustedLines);
+      }
+      return;
+    }
     if (t.kind === 'furniture') {
       this.runLines(t.lines);
       return;
@@ -563,38 +602,47 @@ export class TrainScene extends Phaser.Scene {
     this.runLines(item.exhaustedLines ?? item.lines);
   }
 
+  private liveItems(): Interactable[] {
+    return this.area.interactables.filter((item) => !item.onlyOn || item.onlyOn.includes(GameState.difficulty));
+  }
+
   private changeArea(to: AreaId, side: 'left' | 'right'): void {
     if (this.crossing) return;
     this.crossing = true;
-    Audio.door();
-    Audio.crossing();
-    Audio.duckMusic(0.4);
     this.overlayOpen = true;
     this.player.setVelocity(0, 0);
     this.marker.setVisible(false);
     this.game.events.emit('prompt', null);
-    const dest = AREAS[to];
-    this.game.events.emit('crossing', { from: this.area.name, to: dest.name, side });
+    this.pendingCross = { to, side };
     this.game.events.emit('overlay-open');
-    this.cameras.main.fadeOut(520, 5, 7, 15);
-    this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.time.delayedCall(2800, () => {
-        GameState.x = side === 'right' ? 40 : dest.width - 40;
-        GameState.y = 160;
-        GameState.save();
-        this.buildArea(to, { fadeIn: false, announce: false });
-        this.game.events.emit('crossing-done');
-        Audio.duckMusic(1);
-        this.cameras.main.fadeIn(780, 5, 7, 15);
-        this.cameras.main.once('camerafadeincomplete', () => {
-          this.game.events.emit('area-changed', this.area);
-          this.overlayOpen = false;
-          this.crossing = false;
-          this.game.events.emit('overlay-closed');
-        });
-      });
+    this.game.events.once('crossing-finished', this.finishCrossing, this);
+    this.scene.pause();
+    this.scene.launch(SCENE.crossing, {
+      from: this.area.name,
+      to: AREAS[to].name,
+      dest: to,
+      side,
     });
   }
+
+  private finishCrossing = (info: { dest: AreaId; side: 'left' | 'right' }): void => {
+    const to = this.pendingCross?.to ?? info.dest;
+    const side = this.pendingCross?.side ?? info.side;
+    this.pendingCross = undefined;
+    this.scene.resume();
+    const dest = AREAS[to];
+    GameState.x = side === 'right' ? 40 : dest.width - 40;
+    GameState.y = 160;
+    GameState.save();
+    this.buildArea(to, { fadeIn: false, announce: false });
+    this.cameras.main.fadeIn(500, 5, 7, 15);
+    this.cameras.main.once('camerafadeincomplete', () => {
+      this.game.events.emit('area-changed', this.area);
+      this.overlayOpen = false;
+      this.crossing = false;
+      this.game.events.emit('overlay-closed');
+    });
+  };
 
   /* ---------------------------------------------------------------- */
   /* Overlays                                                          */

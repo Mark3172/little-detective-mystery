@@ -50,9 +50,11 @@ export function label(
     fontSize: `${size}px`,
     color,
     wordWrap: wrap ? { width: wrap } : undefined,
-    lineSpacing: Math.round(size * 0.35),
+    lineSpacing: Math.max(2, Math.round(size * 0.12)),
+    padding: { x: 3, y: 2 },
+    letterSpacing: 0,
   });
-  t.setResolution(1);
+  t.setResolution(2);
   return t;
 }
 
@@ -94,10 +96,12 @@ export function button(
     fontFamily: FONT,
     fontSize: `${size}px`,
     color: opts.color ?? P.paper,
-    wordWrap: { width: w - 26 },
+    wordWrap: text.length > 28 ? { width: w - 28 } : undefined,
     lineSpacing: 2,
+    padding: { x: 3, y: 2 },
+    letterSpacing: 0,
   });
-  txt.setResolution(1);
+  txt.setResolution(2);
   txt.setOrigin(opts.align === 'center' ? 0.5 : 0, 0.5);
   container.add([g, txt]);
 

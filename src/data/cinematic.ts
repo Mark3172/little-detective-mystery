@@ -1,11 +1,25 @@
-import type { Line } from './types';
+import type { Difficulty, Line } from './types';
 
-/** Short briefing after the opening film, once Ori is on the train. */
-export const OPENING_BRIEF: Line[] = [
-  { speaker: 'ori', emotion: 'neutral', text: 'Four people were awake. All four tell me a different story.' },
-  { speaker: 'ori', emotion: 'neutral', text: 'One story is true. I have until Vaskaya to find out which.' },
-  { speaker: 'narrator', text: 'WASD or arrows to move. E or Space to talk. J for the notebook.' },
-];
+export function openingBrief(difficulty: Difficulty): Line[] {
+  const head: Record<Difficulty, Line[]> = {
+    easy: [
+      { speaker: 'ori', emotion: 'neutral', text: 'Four people were awake. Mrs. Pell in Coach B wants to help.' },
+      { speaker: 'ori', emotion: 'neutral', text: 'Amber sparkles mark things to search. I have until Vaskaya.' },
+    ],
+    normal: [
+      { speaker: 'ori', emotion: 'neutral', text: 'Four people were awake. Mr. Holt in the dining car saw a different night.' },
+      { speaker: 'ori', emotion: 'neutral', text: 'Some clues will not shine. I have to look with my own eyes.' },
+    ],
+    hard: [
+      { speaker: 'ori', emotion: 'neutral', text: 'Four people were awake. A porter in the sleep car has a story I do not trust.' },
+      { speaker: 'ori', emotion: 'neutral', text: 'Most clues are hidden. No hints. One story is still true.' },
+    ],
+  };
+  return [
+    ...head[difficulty],
+    { speaker: 'narrator', text: 'WASD or arrows to move. E or Space to talk. J for the notebook.' },
+  ];
+}
 
 export const TWIST: Line[] = [
   { speaker: 'narrator', text: 'HOLLOWMERE PLATFORM — 01:44' },

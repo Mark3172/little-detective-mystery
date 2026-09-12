@@ -21,7 +21,14 @@ export class PauseScene extends Phaser.Scene {
 
     const t = label(this, x + 28, y + 24, 'THE TRAIN WAITS', 24, P.amber4);
     this.add.existing(t);
-    label(this, x + 28, y + 56, `Stop ${GameState.currentStop().index} of 6 — ${GameState.currentStop().name}`, 13, P.slate3);
+    label(
+      this,
+      x + 28,
+      y + 56,
+      `Stop ${GameState.currentStop().index} of 6 — ${GameState.currentStop().name}  ·  ${GameState.difficulty.toUpperCase()}`,
+      13,
+      P.slate3,
+    );
 
     let by = y + 92;
     const bw = w - 56;

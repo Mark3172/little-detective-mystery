@@ -169,7 +169,19 @@ export class NotebookScene extends Phaser.Scene {
     }
 
     if (owned.length === 0) {
-      this.add2(label(this, CX, y0, 'Nothing yet. Look at the amber glints in each carriage.', 16, P.slate3, CW));
+      this.add2(
+      label(
+        this,
+        CX,
+        y0,
+        GameState.difficulty === 'easy'
+          ? 'Nothing yet. Look at the amber sparkles in each car.'
+          : 'Nothing yet. Search seats, counters, and corners. Not every clue shines.',
+        16,
+        P.slate3,
+        CW,
+      ),
+    );
       return;
     }
 
@@ -271,21 +283,28 @@ export class NotebookScene extends Phaser.Scene {
         this,
         CX,
         y0 + 126,
-        'Hints are optional and revealed one at a time. Nothing expires; no witness leaves the train.',
+        GameState.difficulty === 'hard'
+          ? 'Hard case. No hints. Walk every car and talk to everyone, even the ones who lie.'
+          : 'Hints are optional and shown one at a time. Nobody leaves the train.',
         13,
         P.paperDim,
         CW - 30,
       ),
     );
 
-    const hint = HINTS.find((h) => h.requiresFlagsAbsent.some((f) => !GameState.has(f)));
+    const hint =
+      GameState.difficulty === 'hard'
+        ? undefined
+        : HINTS.find((h) => h.requiresFlagsAbsent.some((f) => !GameState.has(f)));
     let hy = y0 + 176;
     for (let i = 0; i < this.hintsShown && hint; i++) {
       this.add2(label(this, CX, hy, `▸ ${hint.text}`, 15, P.violet3, CW - 30));
       hy += 60;
       break;
     }
-    if (hint && this.hintsShown === 0) {
+    if (GameState.difficulty === 'hard') {
+      this.add2(label(this, CX, hy, 'Find the hidden things yourself.', 15, P.slate3, CW - 30));
+    } else if (hint && this.hintsShown === 0) {
       this.buttons.push(
         button(this, CX, hy, 240, 34, 'REVEAL A HINT', () => {
           this.hintsShown = 1;

@@ -12,6 +12,7 @@ const GAMEPLAY = [
   SCENE.accusation,
   SCENE.ending,
   SCENE.pause,
+  SCENE.crossing,
 ] as const;
 
 /** Stop every running story scene so title / new-game / ending never stack. */

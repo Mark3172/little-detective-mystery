@@ -13,6 +13,7 @@ import { ReconstructionScene } from './scenes/ReconstructionScene';
 import { AccusationScene } from './scenes/AccusationScene';
 import { EndingScene } from './scenes/EndingScene';
 import { PauseScene } from './scenes/PauseScene';
+import { CrossingScene } from './scenes/CrossingScene';
 import { Audio } from './core/audio';
 import { attachDebug } from './core/debug';
 
@@ -48,6 +49,7 @@ const game = new Phaser.Game({
     AccusationScene,
     EndingScene,
     PauseScene,
+    CrossingScene,
   ],
 });
 

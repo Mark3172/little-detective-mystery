@@ -5,6 +5,7 @@ import { button, label } from '../ui/kit';
 import { Audio } from '../core/audio';
 import { stopGameplay } from '../core/flow';
 import { charTexture, frameFor } from '../core/art';
+import { captionBar, drawCanopy, drawCoachInterior, drawTrainSide } from '../core/cinemaArt';
 
 /**
  * Interactive opening film. Hotspots and choices are flavour — they do not
@@ -66,13 +67,16 @@ export class OpeningScene extends Phaser.Scene {
 
   private card(title: string, sub: string, hint = 'Space / click to continue'): void {
     this.clearLayer();
-    const t = label(this, GAME_W / 2, 210, title, 36, P.amber4);
+    const emblem = this.add.image(GAME_W / 2, 150, 'title_emblem').setScale(2);
+    const train = drawTrainSide(this, 330);
+    train.setAlpha(0.85);
+    const t = label(this, GAME_W / 2, 210, title, 32, P.amber4);
     t.setOrigin(0.5, 0.5);
-    const s = label(this, GAME_W / 2, 262, sub, 18, P.paperDim, 700);
+    const s = label(this, GAME_W / 2, 258, sub, 16, P.paperDim, 640);
     s.setOrigin(0.5, 0.5);
-    const h = label(this, GAME_W / 2, 470, hint, 13, P.slate3);
+    const h = label(this, GAME_W / 2, 490, hint, 13, P.slate3);
     h.setOrigin(0.5, 0.5);
-    this.layer.add([t, s, h]);
+    this.layer.add([emblem, train, t, s, h]);
     this.bindContinue();
   }
 
@@ -121,36 +125,31 @@ export class OpeningScene extends Phaser.Scene {
   private stationLook(): void {
     this.clearLayer();
     this.busy = true;
-    const band = this.add.rectangle(0, GAME_H - 150, GAME_W, 150, toInt(P.night0)).setOrigin(0, 0);
-    this.layer.add(band);
-    for (let x = 50; x < GAME_W; x += 160) {
-      const win = this.add.rectangle(x, GAME_H - 118, 88, 48, toInt(P.amber1), 0.55).setOrigin(0, 0);
-      this.layer.add(win);
-    }
-    const clock = label(this, GAME_W / 2, 56, 'ALDERMERE JUNCTION  ·  21:04', 20, P.amber4);
-    clock.setOrigin(0.5, 0.5);
-    const cap = label(
+    this.layer.add(drawCanopy(this));
+    const plat = this.add.tileSprite(0, 348, GAME_W, 192, 'cine_plat').setOrigin(0, 0);
+    const train = drawTrainSide(this, 248);
+    const steam = this.add.image(70, 230, 'cine_steam').setScale(2).setAlpha(0.7);
+    this.tweens.add({ targets: steam, y: 210, alpha: 0.2, duration: 1800, yoyo: true, repeat: -1 });
+    const bar = captionBar(
       this,
-      GAME_W / 2,
-      96,
-      'The Meridian is already making steam. Look closer — the film will wait.',
       16,
-      P.paperDim,
-      720,
+      'ALDERMERE JUNCTION  ·  21:04',
+      'The Meridian is already making steam. Click the train, then the hills.',
     );
-    cap.setOrigin(0.5, 0.5);
-    this.layer.add([clock, cap]);
+    this.layer.add([plat, train, steam, bar.root]);
 
     const found: string[] = [];
     const addSpot = (x: number, y: number, w: number, h: number, name: string, text: string) => {
       const z = this.add.zone(x, y, w, h).setOrigin(0, 0).setInteractive({ useHandCursor: true });
-      const rim = this.add.rectangle(x + w / 2, y + h / 2, w, h).setStrokeStyle(1, toInt(P.amber3), 0.45);
-      this.layer.add([rim, z]);
+      const glint = this.add.image(x + w / 2, y + 12, 'glint').setScale(1.4);
+      this.tweens.add({ targets: glint, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 });
+      this.layer.add([glint, z]);
       z.on('pointerdown', () => {
         if (found.includes(name)) return;
         found.push(name);
         Audio.select();
-        cap.setText(text);
+        bar.body.setText(text);
+        glint.setTint(toInt(P.slate3));
         if (found.length >= 2) {
           this.time.delayedCall(900, () => {
             this.busy = false;
@@ -159,22 +158,20 @@ export class OpeningScene extends Phaser.Scene {
         }
       });
     };
-    addSpot(48, GAME_H - 126, 120, 70, 'train', 'Warm windows. Somebody is already sitting very still in Coach B.');
-    addSpot(GAME_W / 2 - 70, 200, 140, 80, 'sky', 'Hard rain. The tunnel is still an hour west, and it does not care who you are.');
-    const hint = label(this, GAME_W / 2, 470, 'Click the train  ·  Click the dark country', 13, P.slate3);
-    hint.setOrigin(0.5, 0.5);
-    this.layer.add(hint);
+    addSpot(40, 248, GAME_W - 80, 120, 'train', 'Warm windows. Somebody is already sitting very still in Coach B.');
+    addSpot(200, 150, 560, 80, 'sky', 'Hard rain. The tunnel is still an hour west.');
   }
 
   private seatChoice(): void {
     this.clearLayer();
     this.busy = true;
+    drawCoachInterior(this, this.layer);
     const ori = this.add
-      .sprite(GAME_W / 2 - 40, 300, charTexture('ori'), frameFor(3, 0))
+      .sprite(420, 300, charTexture('ori'), frameFor(3, 0))
       .setOrigin(0.5, 1)
       .setScale(3);
     this.layer.add(ori);
-    const cap = label(this, GAME_W / 2, 80, 'Seat 9, Coach B. Your science-fair folder is still closed.', 18, P.paper, 700);
+    const cap = label(this, GAME_W / 2, 56, 'Seat 9, Coach B. Your science-fair folder is still closed.', 16, P.paper, 700);
     cap.setOrigin(0.5, 0.5);
     this.layer.add(cap);
     const pick = (line: string) => {
@@ -197,6 +194,7 @@ export class OpeningScene extends Phaser.Scene {
   private blackoutBeat(): void {
     this.clearLayer();
     this.busy = true;
+    drawCoachInterior(this, this.layer);
     const dark = this.add.rectangle(0, 0, GAME_W, GAME_H, toInt(P.night0), 0.2).setOrigin(0, 0);
     this.layer.add(dark);
     const clock = label(this, GAME_W / 2, 120, '23:52:14', 40, P.amber4);
@@ -229,13 +227,17 @@ export class OpeningScene extends Phaser.Scene {
   private titleSlam(): void {
     this.clearLayer();
     this.busy = true;
-    const t = label(this, GAME_W / 2, 200, 'MIDNIGHT EXPRESS', 48, P.amber4);
+    const emblem = this.add.image(GAME_W / 2, 118, 'title_emblem').setScale(1.8).setAlpha(0);
+    const t = label(this, GAME_W / 2, 210, 'MIDNIGHT EXPRESS', 48, P.amber4);
     t.setOrigin(0.5, 0.5).setAlpha(0);
-    const s = label(this, GAME_W / 2, 258, 'The Passenger Who Never Arrived', 22, P.paper);
+    const s = label(this, GAME_W / 2, 268, 'The Passenger Who Never Arrived', 22, P.paper);
     s.setOrigin(0.5, 0.5).setAlpha(0);
-    const o = label(this, GAME_W / 2, 310, 'A case for Ori Calder, aged thirteen', 16, P.slate3);
+    const o = label(this, GAME_W / 2, 318, 'A case for Ori Calder, aged thirteen', 16, P.slate3);
     o.setOrigin(0.5, 0.5).setAlpha(0);
-    this.layer.add([t, s, o]);
+    const train = drawTrainSide(this, 360);
+    train.setAlpha(0.5);
+    this.layer.add([train, emblem, t, s, o]);
+    this.tweens.add({ targets: emblem, alpha: 1, duration: 400 });
     this.tweens.add({ targets: t, alpha: 1, y: 190, duration: 500, ease: 'Back.easeOut' });
     this.tweens.add({ targets: s, alpha: 1, duration: 500, delay: 220 });
     this.tweens.add({ targets: o, alpha: 1, duration: 500, delay: 400 });
