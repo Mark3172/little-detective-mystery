@@ -15,6 +15,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
+    Audio.setTheme('cinematic');
     this.cameras.main.setBackgroundColor(P.night0);
 
     // Layered night backdrop.
@@ -53,7 +54,7 @@ export class TitleScene extends Phaser.Scene {
       GameState.reset();
       GameState.clearSave();
       stopGameplay(this, SCENE.title);
-      this.scene.start(SCENE.train, { prologue: true });
+      this.scene.start(SCENE.opening);
     };
 
     if (hasSavedGame()) {

@@ -222,3 +222,14 @@ No suspect leaves the train. Nothing expires. Station announcements provide tens
 - **Ilse** hands in her notice and takes the Cormery place. Ori buys the last pastry.
 - **Ori** writes it up as *Case 14: The Passenger Who Never Arrived* and notes in the margin:
   *"Not every disappearance is a crime. Some are just someone going home."*
+
+---
+
+## 10. The Hollowmere twist (after the accusation)
+
+The case facts do not change. After Ori names Nadia, **Marta Vell is already on the Hollowmere
+platform**. She is a retired night-express steward, not a last-minute culprit. The kitchen
+light was never "in case" — it was a signal agreed in *The Wandering Ren*: Tuesday trains,
+she waits under the lamp. Notice 12(b) was a bedtime rule she taught Nadia, not a poster
+Nadia discovered tonight. The missing passenger was a story they wrote together. An optional
+kitchen scene after the credits is flavour only.

@@ -338,7 +338,7 @@ export class DialogueScene extends Phaser.Scene {
         this.play([
           { speaker: 'ori', emotion: 'neutral', text: 'Your left sleeve is empty, Mr. Kass. I found something that belongs in it.' },
           { speaker: 'kass', emotion: 'defensive', text: 'Laundry. I already said.' },
-          { speaker: 'ori', emotion: 'neutral', text: '(The cufflink and the crate seal together. One without the other is just a lost button.)' },
+          { speaker: 'ori', emotion: 'neutral', text: '(The cufflink and the box seal together. One without the other is just a lost button.)' },
         ]);
         return;
       }

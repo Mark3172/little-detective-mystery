@@ -3,6 +3,7 @@ import './style.css';
 import { GAME_H, GAME_W } from './core/config';
 import { BootScene } from './scenes/BootScene';
 import { TitleScene } from './scenes/TitleScene';
+import { OpeningScene } from './scenes/OpeningScene';
 import { TrainScene } from './scenes/TrainScene';
 import { HudScene } from './scenes/HudScene';
 import { DialogueScene } from './scenes/DialogueScene';
@@ -37,6 +38,7 @@ const game = new Phaser.Game({
   scene: [
     BootScene,
     TitleScene,
+    OpeningScene,
     TrainScene,
     HudScene,
     DialogueScene,

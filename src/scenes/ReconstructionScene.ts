@@ -242,7 +242,7 @@ export class ReconstructionScene extends Phaser.Scene {
     if (!GameState.hasEvidence('receipt'))
       gaps.push('Nothing places Mr. Kass anywhere specific before the tunnel.');
     if (!GameState.hasEvidence('ticket_nadia') || !GameState.hasEvidence('ticket_ren'))
-      gaps.push('I have no paper trail connecting anyone to Compartment 4.');
+      gaps.push('I have no tickets connecting anyone to Room 4.');
     if (!GameState.has('know_nadia_seen'))
       gaps.push('Nobody has confirmed where Nadia was once the lights came back.');
     return gaps;

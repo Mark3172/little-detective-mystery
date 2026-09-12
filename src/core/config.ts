@@ -15,6 +15,7 @@ export const SETTINGS_KEY = 'midnight-express-settings-v1';
 export const SCENE = {
   boot: 'Boot',
   title: 'Title',
+  opening: 'Opening',
   train: 'Train',
   hud: 'Hud',
   dialogue: 'Dialogue',
@@ -25,3 +26,5 @@ export const SCENE = {
   ending: 'Ending',
   pause: 'Pause',
 } as const;
+
+export type MusicTheme = 'explore' | 'cinematic' | 'finale' | 'credits';

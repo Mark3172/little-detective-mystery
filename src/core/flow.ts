@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { SCENE } from './config';
 
 const GAMEPLAY = [
+  SCENE.opening,
   SCENE.train,
   SCENE.hud,
   SCENE.dialogue,

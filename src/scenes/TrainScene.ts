@@ -7,6 +7,7 @@ import { Audio } from '../core/audio';
 import { AREAS, WALL_BOTTOM, WALL_TOP, type Area, type Interactable, type Solid } from '../data/areas';
 import { CHARACTERS } from '../data/characters';
 import { PROLOGUE } from '../data/story';
+import { OPENING_BRIEF } from '../data/cinematic';
 import type { AreaId, Line } from '../data/types';
 
 type Target =
@@ -18,9 +19,9 @@ type Target =
 const TABLE_LOOK: Line[] = [
   {
     speaker: 'narrator',
-    text: 'A table set for a meal that never arrived. Sugar bowl, two cups, a napkin folded into a hat.',
+    text: 'A table set for a meal that never came. Sugar bowl, two cups, a napkin folded into a hat.',
   },
-  { speaker: 'ori', emotion: 'neutral', text: '(Nothing squared to the edge. Nobody left a name here.)' },
+  { speaker: 'ori', emotion: 'neutral', text: '(Nothing lined up on the edge. Nobody left a name here.)' },
 ];
 
 export class TrainScene extends Phaser.Scene {
@@ -44,6 +45,7 @@ export class TrainScene extends Phaser.Scene {
   private facing: 0 | 1 | 2 | 3 = 0;
   private touchVec = new Phaser.Math.Vector2(0, 0);
   private pendingPrologue = false;
+  private pendingBriefing = false;
   private saveT = 0;
   private crossing = false;
 
@@ -51,8 +53,9 @@ export class TrainScene extends Phaser.Scene {
     super(SCENE.train);
   }
 
-  init(data: { prologue?: boolean }): void {
+  init(data: { prologue?: boolean; briefing?: boolean }): void {
     this.pendingPrologue = !!data?.prologue;
+    this.pendingBriefing = !!data?.briefing;
   }
 
   create(): void {
@@ -65,6 +68,7 @@ export class TrainScene extends Phaser.Scene {
     this.cameras.main.setRoundPixels(true);
     this.cameras.main.setBackgroundColor(P.night0);
 
+    Audio.setTheme('explore');
     this.buildAnimations();
     this.buildArea(GameState.area);
 
@@ -111,6 +115,9 @@ export class TrainScene extends Phaser.Scene {
     if (this.pendingPrologue) {
       this.pendingPrologue = false;
       this.time.delayedCall(300, () => this.runLines(PROLOGUE));
+    } else if (this.pendingBriefing) {
+      this.pendingBriefing = false;
+      this.time.delayedCall(400, () => this.runLines(OPENING_BRIEF));
     }
   }
 
@@ -624,7 +631,7 @@ export class TrainScene extends Phaser.Scene {
     if (this.overlayOpen) return;
     if (!GameState.has('ready_for_reconstruction')) {
       this.runLines([
-        { speaker: 'ori', emotion: 'neutral', text: '(Not yet. I can picture pieces of tonight, but not the shape of it.)' },
+        { speaker: 'ori', emotion: 'neutral', text: '(Not yet. I can see pieces of tonight, but not the whole picture.)' },
         { speaker: 'ori', emotion: 'neutral', text: '(Three contradictions first. Then I can rebuild the whole forty seconds.)' },
       ]);
       return;

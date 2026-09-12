@@ -1,4 +1,5 @@
 import { GameState } from './state';
+import type { MusicTheme } from './config';
 
 /**
  * Everything is synthesised with the Web Audio API — no audio files, no
@@ -10,6 +11,7 @@ class AudioEngine {
   private ambienceGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
   private musicGen = 0;
+  private theme: MusicTheme = 'explore';
   private started = false;
 
   /** Call from any real user gesture (pointerdown / keydown). */
@@ -237,7 +239,17 @@ class AudioEngine {
 
   duckMusic(level: number): void {
     if (!this.musicGain || !this.ctx) return;
-    this.musicGain.gain.setTargetAtTime(Math.max(0, level) * 0.22, this.ctx.currentTime, 0.12);
+    this.musicGain.gain.setTargetAtTime(Math.max(0, level) * 0.28, this.ctx.currentTime, 0.12);
+  }
+
+  setTheme(theme: MusicTheme): void {
+    if (this.theme === theme) return;
+    this.theme = theme;
+    if (!this.musicGain || !this.ctx) return;
+    this.musicGen += 1;
+    const lift = theme === 'explore' ? 0.22 : theme === 'credits' ? 0.2 : 0.3;
+    this.musicGain.gain.setTargetAtTime(lift, this.ctx.currentTime, 0.25);
+    this.playMysteryPhrase(this.musicGen);
   }
 
   chime(): void {
@@ -273,7 +285,7 @@ class AudioEngine {
     lp.type = 'lowpass';
     lp.frequency.value = 1650;
     this.musicGain.connect(lp).connect(this.master);
-    this.musicGain.gain.setTargetAtTime(0.22, ctx.currentTime, 1.4);
+    this.musicGain.gain.setTargetAtTime(0.26, ctx.currentTime, 1.4);
 
     const drone = (freq: number, vol: number) => {
       const osc = ctx.createOscillator();
@@ -315,31 +327,78 @@ class AudioEngine {
       osc.stop(t0 + at + dur + 0.05);
     };
 
-    // A-minor music-box line. Quiet enough to sit under rain and rumble.
-    const melody: [number, number, number, number][] = [
-      [0.0, 440, 0.72, 0.05],
-      [0.9, 523.25, 0.55, 0.045],
-      [1.55, 659.25, 1.15, 0.04],
-      [2.85, 587.33, 0.38, 0.042],
-      [3.28, 523.25, 0.38, 0.04],
-      [3.72, 440, 0.95, 0.045],
-      [4.8, 392, 0.42, 0.04],
-      [5.28, 349.23, 0.42, 0.038],
-      [5.78, 329.63, 0.95, 0.044],
-      [6.85, 261.63, 0.5, 0.04],
-      [7.45, 220, 1.5, 0.048],
-    ];
-    for (const [at, f, d, v] of melody) note(at, f, d, v);
+    const hit = (at: number, freq: number, dur: number, vol: number) => note(at, freq, dur, vol, 'sine');
 
-    const harmony: [number, number, number][] = [
-      [0.0, 220, 2.5],
-      [2.7, 174.61, 2.0],
-      [4.8, 164.81, 1.9],
-      [6.85, 110, 2.2],
-    ];
-    for (const [at, f, d] of harmony) note(at, f, d, 0.028, 'sine');
+    let wait = 9200;
+    if (this.theme === 'cinematic') {
+      wait = 7200;
+      for (let i = 0; i < 14; i++) hit(i * 0.5, 55, 0.12, 0.055);
+      const melody: [number, number, number, number][] = [
+        [0.0, 440, 0.28, 0.07],
+        [0.5, 523.25, 0.28, 0.065],
+        [1.0, 659.25, 0.45, 0.07],
+        [1.5, 783.99, 0.7, 0.06],
+        [2.25, 659.25, 0.28, 0.06],
+        [2.75, 587.33, 0.28, 0.058],
+        [3.25, 440, 0.5, 0.065],
+        [4.0, 349.23, 0.28, 0.06],
+        [4.5, 392, 0.28, 0.06],
+        [5.0, 523.25, 0.7, 0.07],
+        [5.75, 440, 0.9, 0.068],
+      ];
+      for (const row of melody) note(...row);
+      note(0.0, 110, 3.4, 0.04, 'sine');
+      note(3.4, 98, 3.4, 0.038, 'sine');
+    } else if (this.theme === 'finale') {
+      wait = 8000;
+      const melody: [number, number, number, number][] = [
+        [0.0, 523.25, 0.6, 0.06],
+        [0.7, 659.25, 0.6, 0.058],
+        [1.4, 783.99, 1.1, 0.055],
+        [2.6, 880, 0.45, 0.05],
+        [3.1, 783.99, 0.45, 0.05],
+        [3.6, 659.25, 1.0, 0.055],
+        [4.8, 587.33, 0.5, 0.05],
+        [5.4, 523.25, 1.8, 0.06],
+      ];
+      for (const row of melody) note(...row);
+      note(0.0, 130.81, 4, 0.036, 'sine');
+      note(4.0, 146.83, 3.6, 0.034, 'sine');
+    } else if (this.theme === 'credits') {
+      wait = 10000;
+      const melody: [number, number, number, number][] = [
+        [0.0, 329.63, 1.1, 0.05],
+        [1.2, 392, 1.1, 0.045],
+        [2.5, 440, 1.4, 0.05],
+        [4.1, 523.25, 1.2, 0.048],
+        [5.5, 493.88, 1.0, 0.042],
+        [6.7, 440, 2.2, 0.05],
+      ];
+      for (const row of melody) note(...row);
+      note(0.0, 164.81, 4.8, 0.03, 'sine');
+      note(5.0, 146.83, 4.6, 0.028, 'sine');
+    } else {
+      const melody: [number, number, number, number][] = [
+        [0.0, 440, 0.72, 0.055],
+        [0.9, 523.25, 0.55, 0.05],
+        [1.55, 659.25, 1.15, 0.048],
+        [2.85, 587.33, 0.38, 0.048],
+        [3.28, 523.25, 0.38, 0.045],
+        [3.72, 440, 0.95, 0.05],
+        [4.8, 392, 0.42, 0.045],
+        [5.28, 349.23, 0.42, 0.042],
+        [5.78, 329.63, 0.95, 0.05],
+        [6.85, 261.63, 0.5, 0.045],
+        [7.45, 220, 1.5, 0.055],
+      ];
+      for (const row of melody) note(...row);
+      note(0.0, 220, 2.5, 0.03, 'sine');
+      note(2.7, 174.61, 2.0, 0.028, 'sine');
+      note(4.8, 164.81, 1.9, 0.028, 'sine');
+      note(6.85, 110, 2.2, 0.03, 'sine');
+    }
 
-    window.setTimeout(() => this.playMysteryPhrase(gen), 9200);
+    window.setTimeout(() => this.playMysteryPhrase(gen), wait);
   }
 }
 
